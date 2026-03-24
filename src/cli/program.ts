@@ -8,6 +8,8 @@ import { makeTechspecCommand } from "./commands/techspec.js";
 import { makeTasksCommand } from "./commands/tasks.js";
 import { makeCommitCommand } from "./commands/commit.js";
 import { makeRunTasksCommand } from "./commands/run-tasks.js";
+import { makeTestCommand } from "./commands/test.js";
+import { makeReviewCommand } from "./commands/review.js";
 
 function loadVersion(): string {
   const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -34,5 +36,7 @@ export function createProgram(): Command {
   program.addCommand(makeTasksCommand());
   program.addCommand(makeCommitCommand());
   program.addCommand(makeRunTasksCommand());
+  program.addCommand(makeTestCommand());
+  program.addCommand(makeReviewCommand());
   return program;
 }
