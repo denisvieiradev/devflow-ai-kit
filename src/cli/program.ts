@@ -6,6 +6,8 @@ import { makeInitCommand } from "./commands/init.js";
 import { makePrdCommand } from "./commands/prd.js";
 import { makeTechspecCommand } from "./commands/techspec.js";
 import { makeTasksCommand } from "./commands/tasks.js";
+import { makeCommitCommand } from "./commands/commit.js";
+import { makeRunTasksCommand } from "./commands/run-tasks.js";
 
 function loadVersion(): string {
   const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -30,5 +32,7 @@ export function createProgram(): Command {
   program.addCommand(makePrdCommand());
   program.addCommand(makeTechspecCommand());
   program.addCommand(makeTasksCommand());
+  program.addCommand(makeCommitCommand());
+  program.addCommand(makeRunTasksCommand());
   return program;
 }
