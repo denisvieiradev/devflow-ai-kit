@@ -4,6 +4,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeInitCommand } from "./commands/init.js";
 import { makePrdCommand } from "./commands/prd.js";
+import { makeTechspecCommand } from "./commands/techspec.js";
+import { makeTasksCommand } from "./commands/tasks.js";
 
 function loadVersion(): string {
   const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -26,5 +28,7 @@ export function createProgram(): Command {
     .version(loadVersion());
   program.addCommand(makeInitCommand());
   program.addCommand(makePrdCommand());
+  program.addCommand(makeTechspecCommand());
+  program.addCommand(makeTasksCommand());
   return program;
 }

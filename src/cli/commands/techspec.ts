@@ -1,1 +1,78 @@
-export {};
+import { Command } from "commander";
+import * as p from "@clack/prompts";
+import ora from "ora";
+import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { readConfig } from "../../core/config.js";
+import { readState, writeState, updatePhase, setArtifact } from "../../core/state.js";
+import { resolveFeatureRef, getFeaturePath } from "../../core/pipeline.js";
+import { TemplateEngine } from "../../core/template.js";
+import { ContextBuilder, type Document } from "../../core/context.js";
+import { ClaudeProvider } from "../../providers/claude.js";
+import { resolveModelTier } from "../../providers/model-router.js";
+import { fileExists } from "../../infra/filesystem.js";
+
+export function makeTechspecCommand(): Command {
+  return new Command("techspec")
+    .description("Generate a tech spec from an existing PRD")
+    .argument("[ref]", "Feature reference (number or slug)")
+    .action(async (ref: string | undefined) => {
+      const cwd = process.cwd();
+      p.intro("devflow techspec");
+      const config = await readConfig(cwd);
+      if (!config) {
+        p.cancel("No config found. Run `devflow init` first.");
+        process.exit(1);
+      }
+      let state = await readState(cwd);
+      if (!ref) {
+        p.cancel("Feature reference is required. Usage: devflow techspec <ref>");
+        process.exit(1);
+      }
+      const featureRef = await resolveFeatureRef(cwd, state, ref);
+      if (!featureRef) {
+        p.cancel(`Feature '${ref}' not found.`);
+        process.exit(1);
+      }
+      const featurePath = getFeaturePath(cwd, featureRef);
+      const prdPath = join(featurePath, "prd.md");
+      if (!(await fileExists(prdPath))) {
+        p.cancel(`PRD not found at ${prdPath}. Run \`devflow prd\` first.`);
+        process.exit(1);
+      }
+      const prdContent = await readFile(prdPath, "utf-8");
+      const provider = new ClaudeProvider(config);
+      const tier = resolveModelTier("techspec");
+      const templateEngine = new TemplateEngine(config.templatesPath);
+      const template = await templateEngine.load("techspec");
+      const contextBuilder = new ContextBuilder();
+      const docs: Document[] = [
+        { name: "PRD", content: prdContent, priority: "high" },
+        { name: "Template", content: template, priority: "medium" },
+      ];
+      const context = contextBuilder.build(docs, config.contextMode);
+      const spinner = ora();
+      spinner.start("Generating tech spec...");
+      const response = await provider.chat({
+        systemPrompt: `You are a senior software architect. Generate a detailed technical specification in Markdown based on the PRD provided. Use the template structure as a guide. Include architecture decisions, interfaces, data models, sequencing, and testing strategy. Be thorough and specific.`,
+        messages: [{ role: "user", content: context }],
+        model: tier,
+      });
+      spinner.stop();
+      const techspecPath = join(featurePath, "techspec.md");
+      await writeFile(techspecPath, response.content, "utf-8");
+      const hash = createHash("md5").update(response.content).digest("hex");
+      const now = new Date().toISOString();
+      state = setArtifact(state, featureRef, "techspec", {
+        path: `.devflow/features/${featureRef}/techspec.md`,
+        createdAt: now,
+        updatedAt: now,
+        hash,
+      });
+      state = updatePhase(state, featureRef, "techspec_created");
+      await writeState(cwd, state);
+      p.log.success(`Tech spec saved: ${techspecPath}`);
+      p.outro(`Tokens: ${response.usage.inputTokens} in / ${response.usage.outputTokens} out`);
+    });
+}
