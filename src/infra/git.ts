@@ -84,3 +84,12 @@ export async function push(
 export async function fetch(cwd: string, remote: string): Promise<void> {
   await run(["fetch", remote], cwd);
 }
+
+export async function getChangedFiles(cwd: string): Promise<string[]> {
+  const output = await run(["status", "--porcelain"], cwd);
+  if (!output) return [];
+  return output
+    .split("\n")
+    .map((line) => line.slice(3).trim())
+    .filter((file) => file.length > 0);
+}

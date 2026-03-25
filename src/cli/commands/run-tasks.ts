@@ -98,11 +98,21 @@ export function makeRunTasksCommand(): Command {
         state = completeTask(state, featureRef, task.number);
         await writeState(cwd, state);
         try {
-          await git.add(cwd, ["."]);
-          const safeTitle = task.title.replace(/[`"'\n\r\t\\]/g, "").slice(0, 100);
-          await git.commit(cwd, `feat: complete task ${task.number} - ${safeTitle}`);
-          const log = await git.getLog(cwd, undefined, 1);
-          p.log.success(`Task ${task.number} done — ${log}`);
+          const SENSITIVE_PATTERNS = [".env", ".secret", "credentials", ".key", ".pem"];
+          const changedFiles = await git.getChangedFiles(cwd);
+          const safeFiles = changedFiles.filter(
+            (f) => !SENSITIVE_PATTERNS.some((pat) => f.toLowerCase().includes(pat)),
+          );
+          if (safeFiles.length === 0) {
+            p.log.info(`Task ${task.number} done (no changes to commit)`);
+          } else {
+            p.log.info(`Staging ${safeFiles.length} file(s): ${safeFiles.join(", ")}`);
+            await git.add(cwd, safeFiles);
+            const safeTitle = task.title.replace(/[`"'\n\r\t\\]/g, "").slice(0, 100);
+            await git.commit(cwd, `feat: complete task ${task.number} - ${safeTitle}`);
+            const log = await git.getLog(cwd, undefined, 1);
+            p.log.success(`Task ${task.number} done — ${log}`);
+          }
         } catch {
           p.log.info(`Task ${task.number} done (no changes to commit)`);
         }
