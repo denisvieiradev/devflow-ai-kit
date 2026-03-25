@@ -81,4 +81,174 @@ describe("ProjectScanner", () => {
     expect(result.testFramework).toBeNull();
     expect(result.hasCI).toBe(false);
   });
+
+  it("should detect Java project with build.gradle", async () => {
+    await writeFile(join(tempDir, "build.gradle"), "apply plugin: 'java'");
+    const result = await scanProject(tempDir);
+    expect(result.language).toBe("java");
+  });
+
+  it("should detect Java project with pom.xml", async () => {
+    await writeFile(join(tempDir, "pom.xml"), "<project></project>");
+    const result = await scanProject(tempDir);
+    expect(result.language).toBe("java");
+  });
+
+  it("should detect Python with pyproject.toml", async () => {
+    await writeFile(join(tempDir, "pyproject.toml"), "[tool.poetry]");
+    const result = await scanProject(tempDir);
+    expect(result.language).toBe("python");
+  });
+
+  it("should detect Next.js framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { next: "^14" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("next");
+  });
+
+  it("should detect Nuxt framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { nuxt: "^3" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("nuxt");
+  });
+
+  it("should detect Angular framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { "@angular/core": "^17" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("angular");
+  });
+
+  it("should detect Vue framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { vue: "^3" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("vue");
+  });
+
+  it("should detect Express framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { express: "^4" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("express");
+  });
+
+  it("should detect Fastify framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { fastify: "^4" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("fastify");
+  });
+
+  it("should detect NestJS framework", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { "@nestjs/core": "^10" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("nestjs");
+  });
+
+  it("should detect Django framework", async () => {
+    await writeFile(join(tempDir, "requirements.txt"), "django==4.2\n");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("django");
+  });
+
+  it("should detect FastAPI framework", async () => {
+    await writeFile(join(tempDir, "requirements.txt"), "fastapi\n");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBe("fastapi");
+  });
+
+  it("should detect Vitest test framework from config", async () => {
+    await writeFile(join(tempDir, "package.json"), JSON.stringify({}));
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    await writeFile(join(tempDir, "vitest.config.ts"), "export default {}");
+    const result = await scanProject(tempDir);
+    expect(result.testFramework).toBe("vitest");
+  });
+
+  it("should detect Jest from package.json devDependencies", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ devDependencies: { jest: "^29" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.testFramework).toBe("jest");
+  });
+
+  it("should detect Vitest from package.json devDependencies", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ devDependencies: { vitest: "^1" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.testFramework).toBe("vitest");
+  });
+
+  it("should detect pytest from pytest.ini", async () => {
+    await writeFile(join(tempDir, "requirements.txt"), "some-lib\n");
+    await writeFile(join(tempDir, "pytest.ini"), "[pytest]");
+    const result = await scanProject(tempDir);
+    expect(result.testFramework).toBe("pytest");
+  });
+
+  it("should detect GitLab CI", async () => {
+    await writeFile(join(tempDir, ".gitlab-ci.yml"), "stages: [build]");
+    const result = await scanProject(tempDir);
+    expect(result.hasCI).toBe(true);
+  });
+
+  it("should detect Jenkinsfile CI", async () => {
+    await writeFile(join(tempDir, "Jenkinsfile"), "pipeline {}");
+    const result = await scanProject(tempDir);
+    expect(result.hasCI).toBe(true);
+  });
+
+  it("should return null framework for unknown Python deps", async () => {
+    await writeFile(join(tempDir, "requirements.txt"), "requests\n");
+    const result = await scanProject(tempDir);
+    expect(result.language).toBe("python");
+    expect(result.framework).toBeNull();
+  });
+
+  it("should return null framework for Node project without known deps", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify({ dependencies: { lodash: "^4" } }),
+    );
+    await writeFile(join(tempDir, "tsconfig.json"), "{}");
+    const result = await scanProject(tempDir);
+    expect(result.framework).toBeNull();
+  });
+
+  it("should detect project name from directory", async () => {
+    const result = await scanProject(tempDir);
+    expect(result.name).toBeTruthy();
+    expect(typeof result.name).toBe("string");
+  });
 });

@@ -74,4 +74,59 @@ describe("GitClient", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("add b");
   });
+
+  it("should create branch with startPoint", async () => {
+    await writeFile(join(tempDir, "file.txt"), "content");
+    await git.add(tempDir, ["file.txt"]);
+    await git.commit(tempDir, "add file");
+    const baseBranch = await git.getBranch(tempDir);
+    await git.createBranch(tempDir, "feature/from-start", baseBranch);
+    const branch = await git.getBranch(tempDir);
+    expect(branch).toBe("feature/from-start");
+  });
+
+  it("should get unstaged diff without base", async () => {
+    await writeFile(join(tempDir, "README.md"), "# Updated");
+    const diff = await git.getDiff(tempDir);
+    expect(diff).toContain("Updated");
+  });
+
+  it("should get log with range", async () => {
+    const baseBranch = await git.getBranch(tempDir);
+    await git.createBranch(tempDir, "feature/log-range");
+    await writeFile(join(tempDir, "range.txt"), "range");
+    await git.add(tempDir, ["range.txt"]);
+    await git.commit(tempDir, "add range file");
+    const log = await git.getLog(tempDir, `${baseBranch}..HEAD`);
+    expect(log).toContain("add range file");
+  });
+
+  it("should checkout existing branch", async () => {
+    await git.createBranch(tempDir, "feature/checkout-test");
+    const baseBranch = (await exec("git", ["rev-parse", "--abbrev-ref", "HEAD@{1}"], { cwd: tempDir }).catch(() => ({ stdout: "main" }))).stdout.trim() || "main";
+    await git.checkout(tempDir, "feature/checkout-test");
+    const branch = await git.getBranch(tempDir);
+    expect(branch).toBe("feature/checkout-test");
+  });
+
+  it("should push to remote", async () => {
+    // Create a bare remote repo
+    const remoteDir = await mkdtemp(join(tmpdir(), "devflow-remote-"));
+    await exec("git", ["init", "--bare"], { cwd: remoteDir });
+    await exec("git", ["remote", "add", "origin", remoteDir], { cwd: tempDir });
+    await git.push(tempDir, "origin", await git.getBranch(tempDir));
+    // Verify by fetching
+    const result = await exec("git", ["ls-remote", "origin"], { cwd: tempDir });
+    expect(result.stdout).toContain("refs/heads/");
+    await rm(remoteDir, { recursive: true, force: true });
+  });
+
+  it("should fetch from remote", async () => {
+    const remoteDir = await mkdtemp(join(tmpdir(), "devflow-remote-"));
+    await exec("git", ["init", "--bare"], { cwd: remoteDir });
+    await exec("git", ["remote", "add", "origin", remoteDir], { cwd: tempDir });
+    await git.push(tempDir, "origin", await git.getBranch(tempDir));
+    await expect(git.fetch(tempDir, "origin")).resolves.not.toThrow();
+    await rm(remoteDir, { recursive: true, force: true });
+  });
 });

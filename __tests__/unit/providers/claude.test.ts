@@ -12,8 +12,8 @@ jest.unstable_mockModule("@anthropic-ai/sdk", () => {
       constructor() {}
       static APIError = class extends Error {
         status: number;
-        constructor(status: number, message: string) {
-          super(message);
+        constructor(status: number, _error: unknown, message: string | undefined, _headers: unknown) {
+          super(message ?? "API Error");
           this.status = status;
         }
       };
@@ -98,5 +98,99 @@ describe("ClaudeProvider", () => {
       messages: [{ role: "user", content: "test" }],
     };
     await expect(provider.chat(params)).rejects.toThrow("Bad request");
+  });
+
+  it("should retry on 429 rate limit errors", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const apiError = new Anthropic.APIError(429, undefined, "Rate limited", {});
+    mockCreate
+      .mockRejectedValueOnce(apiError)
+      .mockResolvedValueOnce({
+        content: [{ type: "text", text: "success after retry" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+    const provider = new ClaudeProvider(DEFAULT_CONFIG);
+    const params: ChatParams = {
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    };
+    const result = await provider.chat(params);
+    expect(result.content).toBe("success after retry");
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  }, 15000);
+
+  it("should retry on 529 overloaded errors", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const apiError = new Anthropic.APIError(529, undefined, "Overloaded", {});
+    mockCreate
+      .mockRejectedValueOnce(apiError)
+      .mockResolvedValueOnce({
+        content: [{ type: "text", text: "recovered" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+    const provider = new ClaudeProvider(DEFAULT_CONFIG);
+    const params: ChatParams = {
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    };
+    const result = await provider.chat(params);
+    expect(result.content).toBe("recovered");
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+  }, 15000);
+
+  it("should throw after max retries exhausted", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const apiError = new Anthropic.APIError(429, undefined, "Rate limited", {});
+    mockCreate
+      .mockRejectedValueOnce(apiError)
+      .mockRejectedValueOnce(apiError)
+      .mockRejectedValueOnce(apiError);
+    const provider = new ClaudeProvider(DEFAULT_CONFIG);
+    const params: ChatParams = {
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    };
+    await expect(provider.chat(params)).rejects.toThrow();
+    expect(mockCreate).toHaveBeenCalledTimes(3);
+  }, 30000);
+
+  it("should not retry on 401 auth errors", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const apiError = new Anthropic.APIError(401, undefined, "Unauthorized", {});
+    mockCreate.mockRejectedValue(apiError);
+    const provider = new ClaudeProvider(DEFAULT_CONFIG);
+    const params: ChatParams = {
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    };
+    await expect(provider.chat(params)).rejects.toThrow();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("should use custom maxTokens when provided", async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: "text", text: "ok" }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const provider = new ClaudeProvider(DEFAULT_CONFIG);
+    const params: ChatParams = {
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+      maxTokens: 8192,
+    };
+    await provider.chat(params);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ max_tokens: 8192 }),
+    );
+  });
+
+  it("should handle non-Error thrown values", async () => {
+    mockCreate.mockRejectedValue("string error");
+    const provider = new ClaudeProvider(DEFAULT_CONFIG);
+    const params: ChatParams = {
+      systemPrompt: "test",
+      messages: [{ role: "user", content: "test" }],
+    };
+    await expect(provider.chat(params)).rejects.toThrow("string error");
   });
 });
