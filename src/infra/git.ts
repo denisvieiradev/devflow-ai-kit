@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { debug } from "./logger.js";
 
 const exec = promisify(execFile);
+const GIT_TIMEOUT_MS = 30_000;
 
 interface ExecResult {
   stdout: string;
@@ -11,8 +12,15 @@ interface ExecResult {
 
 async function run(args: string[], cwd: string): Promise<string> {
   debug("git command", { args, cwd });
-  const result: ExecResult = await exec("git", args, { cwd });
-  return result.stdout.trim();
+  try {
+    const result: ExecResult = await exec("git", args, { cwd, timeout: GIT_TIMEOUT_MS });
+    return result.stdout.trim();
+  } catch (err: unknown) {
+    if (err instanceof Error && "killed" in err && (err as { killed: boolean }).killed) {
+      throw new Error(`Git command timed out after ${GIT_TIMEOUT_MS / 1000}s: git ${args.join(" ")}`);
+    }
+    throw err;
+  }
 }
 
 export async function getBranch(cwd: string): Promise<string> {

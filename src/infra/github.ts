@@ -31,5 +31,9 @@ export async function createPR(params: CreatePRParams): Promise<PRResult> {
     args.push("--base", params.base);
   }
   const result = await exec("gh", args, { cwd: params.cwd });
-  return { url: result.stdout.trim() };
+  const url = result.stdout?.trim();
+  if (!url) {
+    throw new Error("gh pr create returned empty output — check gh auth status");
+  }
+  return { url };
 }

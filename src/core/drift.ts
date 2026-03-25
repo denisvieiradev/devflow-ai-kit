@@ -16,7 +16,7 @@ const DOWNSTREAM_MAP: Record<string, string[]> = {
 
 export async function hashFile(filePath: string): Promise<string> {
   const content = await readFile(filePath, "utf-8");
-  return createHash("md5").update(content).digest("hex");
+  return createHash("sha256").update(content).digest("hex");
 }
 
 export async function checkDrift(
