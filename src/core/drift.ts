@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileExists } from "../infra/filesystem.js";
 import type { DevflowState } from "./types.js";
 
@@ -32,7 +33,7 @@ export async function checkDrift(
     if (!artifact) continue;
     const hasDownstream = downstream.some((d) => feature.artifacts[d]);
     if (!hasDownstream) continue;
-    const fullPath = `${projectRoot}/${artifact.path}`;
+    const fullPath = join(projectRoot, artifact.path);
     if (!(await fileExists(fullPath))) continue;
     const currentHash = await hashFile(fullPath);
     if (currentHash !== artifact.hash) {

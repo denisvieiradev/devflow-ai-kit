@@ -13,7 +13,7 @@ export function getNextFeatureNumber(state: DevflowState): number {
 }
 
 export function generateSlug(description: string): string {
-  return description
+  const slug = description
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
@@ -21,6 +21,7 @@ export function generateSlug(description: string): string {
     .replace(/^-|-$/g, "")
     .slice(0, MAX_SLUG_LENGTH)
     .replace(/-$/, "");
+  return slug || "feature";
 }
 
 export function formatFeatureRef(number: number, slug: string): string {

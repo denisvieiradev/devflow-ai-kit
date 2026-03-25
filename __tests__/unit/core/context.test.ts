@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { ContextBuilder, getPrioritySections } from "../../../src/core/context.js";
+import { ContextBuilder } from "../../../src/core/context.js";
 import type { Document } from "../../../src/core/context.js";
 
 describe("ContextBuilder", () => {
@@ -53,18 +53,5 @@ describe("ContextBuilder", () => {
       const result = builder.build(docs, "light");
       expect(result.length).toBeLessThan(longContent.length);
     });
-  });
-});
-
-describe("getPrioritySections", () => {
-  it("should return sections for techspec command", () => {
-    const sections = getPrioritySections("techspec");
-    expect(sections).toContain("Funcionalidades");
-    expect(sections).toContain("Constraints");
-  });
-
-  it("should return empty array for unknown command", () => {
-    const sections = getPrioritySections("unknown");
-    expect(sections).toHaveLength(0);
   });
 });

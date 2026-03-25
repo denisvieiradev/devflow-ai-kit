@@ -54,7 +54,7 @@ export function makeReviewCommand(): Command {
       try {
         spinner.start("Reviewing code...");
         response = await provider.chat({
-        systemPrompt: `You are a senior code reviewer. Analyze the diff and produce a code review with findings in these categories:
+          systemPrompt: `You are a senior code reviewer. Analyze the diff and produce a code review with findings in these categories:
 
 ## Critical
 Issues that must be fixed before merging (bugs, security, data loss).
@@ -71,7 +71,7 @@ For each finding, include:
 - Suggested fix
 
 End with a summary: total findings count per category and overall recommendation (approve, request changes).`,
-        messages: [{ role: "user", content: context }],
+          messages: [{ role: "user", content: context }],
           model: tier,
         });
         spinner.stop();

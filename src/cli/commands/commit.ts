@@ -31,7 +31,7 @@ export function makeCommitCommand(): Command {
       try {
         spinner.start("Analyzing changes...");
         response = await provider.chat({
-        systemPrompt: `You are a developer writing commit messages. Analyze the git diff and generate a conventional commit message.
+          systemPrompt: `You are a developer writing commit messages. Analyze the git diff and generate a conventional commit message.
 
 Rules:
 - Format: type(scope): description
@@ -40,7 +40,7 @@ Rules:
 - Scope is optional but recommended
 - Do NOT mention AI, Claude, generated, LLM, or copilot
 - Return ONLY the commit message, nothing else`,
-        messages: [{ role: "user", content: diff }],
+          messages: [{ role: "user", content: diff }],
           model: tier,
         });
         spinner.stop();

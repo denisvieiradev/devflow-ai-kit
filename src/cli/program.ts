@@ -1,7 +1,5 @@
 import { Command } from "commander";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { makeInitCommand } from "./commands/init.js";
 import { makePrdCommand } from "./commands/prd.js";
 import { makeTechspecCommand } from "./commands/techspec.js";
@@ -15,10 +13,9 @@ import { makeDoneCommand } from "./commands/done.js";
 import { makeStatusCommand } from "./commands/status.js";
 
 function loadVersion(): string {
-  const currentDir = dirname(fileURLToPath(import.meta.url));
-  const pkgPath = join(currentDir, "..", "package.json");
   try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    const require = createRequire(import.meta.url);
+    const pkg = require("../package.json") as { version?: string };
     return pkg.version ?? "0.0.0";
   } catch {
     return "0.0.0";

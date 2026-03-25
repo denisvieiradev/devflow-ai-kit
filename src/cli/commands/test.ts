@@ -48,14 +48,14 @@ export function makeTestCommand(): Command {
       try {
         spinner.start("Generating test plan...");
         response = await provider.chat({
-        systemPrompt: `You are a QA engineer. Based on the PRD and tech spec, generate a comprehensive test plan with test cases. Include:
+          systemPrompt: `You are a QA engineer. Based on the PRD and tech spec, generate a comprehensive test plan with test cases. Include:
 1. Unit test suggestions with file paths and test descriptions
 2. Integration test suggestions
 3. Edge cases to consider
 4. Manual QA checklist
 
 Format as Markdown with clear sections.`,
-        messages: [{ role: "user", content: context }],
+          messages: [{ role: "user", content: context }],
           model: tier,
         });
         spinner.stop();
