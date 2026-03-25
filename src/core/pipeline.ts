@@ -35,22 +35,30 @@ export function getFeaturePath(projectRoot: string, featureRef: string): string 
   return join(projectRoot, FEATURES_DIR, featureRef);
 }
 
+function normalizeRef(ref: string): string {
+  if (/^\d+$/.test(ref)) {
+    return ref.padStart(3, "0");
+  }
+  return ref;
+}
+
+function matchesRef(key: string, ref: string): boolean {
+  const normalized = normalizeRef(ref);
+  return key === ref || key.startsWith(`${normalized}-`);
+}
+
 export async function resolveFeatureRef(
   projectRoot: string,
   state: DevflowState,
   ref: string,
 ): Promise<string | null> {
   if (state.features[ref]) return ref;
-  const match = Object.keys(state.features).find(
-    (key) => key.startsWith(ref) || key.includes(ref),
-  );
+  const match = Object.keys(state.features).find((key) => matchesRef(key, ref));
   if (match) return match;
   const featuresDir = getFeaturesDir(projectRoot);
   if (await fileExists(featuresDir)) {
     const entries = await readdir(featuresDir);
-    const dirMatch = entries.find(
-      (entry) => entry.startsWith(ref) || entry.includes(ref),
-    );
+    const dirMatch = entries.find((entry) => matchesRef(entry, ref));
     if (dirMatch) return dirMatch;
   }
   return null;
