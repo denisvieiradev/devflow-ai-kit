@@ -121,6 +121,19 @@ describe("GitClient", () => {
     await rm(remoteDir, { recursive: true, force: true });
   });
 
+  it("should return empty array for getChangedFiles on clean repo", async () => {
+    const files = await git.getChangedFiles(tempDir);
+    expect(files).toEqual([]);
+  });
+
+  it("should return changed files from getChangedFiles", async () => {
+    await writeFile(join(tempDir, "new.txt"), "new content");
+    await writeFile(join(tempDir, "another.txt"), "another");
+    const files = await git.getChangedFiles(tempDir);
+    expect(files).toContain("new.txt");
+    expect(files).toContain("another.txt");
+  });
+
   it("should fetch from remote", async () => {
     const remoteDir = await mkdtemp(join(tmpdir(), "devflow-remote-"));
     await exec("git", ["init", "--bare"], { cwd: remoteDir });

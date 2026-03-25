@@ -210,4 +210,66 @@ describe("run-tasks command", () => {
     expect(mockHandleLLMError).toHaveBeenCalled();
     expect(mockGitCommit).not.toHaveBeenCalled();
   });
+
+  it("should exit when feature not found in state", async () => {
+    const state = { features: {} };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { balanced: "sonnet" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue(state);
+    mockResolveFeatureRef.mockResolvedValue("001-nonexistent");
+
+    const cmd = makeRunTasksCommand();
+    await expect(cmd.parseAsync(["node", "test", "001"])).rejects.toThrow("process.exit");
+    expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  it("should skip commit when all changed files are sensitive", async () => {
+    const feature = makeFeature({
+      tasks: [{ number: 1, title: "Setup", completed: false }],
+    });
+    const state = { features: { "001-auth": feature } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { balanced: "sonnet" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue(state);
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockCompleteTask.mockReturnValue(state);
+    mockChat.mockResolvedValue({
+      content: "done",
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockGetChangedFiles.mockResolvedValue([".env", ".env.local", "credentials.json"]);
+
+    const cmd = makeRunTasksCommand();
+    await cmd.parseAsync(["node", "test", "001"]);
+
+    expect(mockAdd).not.toHaveBeenCalled();
+    expect(mockGitCommit).not.toHaveBeenCalled();
+  });
+
+  it("should not update phase when already in_progress", async () => {
+    const feature = makeFeature({
+      phase: "in_progress",
+      tasks: [{ number: 1, title: "Setup", completed: false }],
+    });
+    const state = { features: { "001-auth": feature } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { balanced: "sonnet" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue(state);
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockCompleteTask.mockReturnValue(state);
+    mockChat.mockResolvedValue({
+      content: "done",
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockGetChangedFiles.mockResolvedValue(["src/file.ts"]);
+    mockGitCommit.mockResolvedValue("abc1234");
+
+    const { updatePhase } = await import("../../../src/core/state.js");
+    const mockUpdatePhase = updatePhase as jest.MockedFunction<typeof updatePhase>;
+
+    const cmd = makeRunTasksCommand();
+    await cmd.parseAsync(["node", "test", "001"]);
+
+    expect(mockUpdatePhase).not.toHaveBeenCalled();
+  });
 });

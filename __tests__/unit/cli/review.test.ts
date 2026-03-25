@@ -152,6 +152,55 @@ describe("review command", () => {
     );
   });
 
+  it("should fallback to unstaged diff when base diff fails", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { powerful: "opus" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue({ features: { "001-auth": {} } });
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockGetDiff
+      .mockRejectedValueOnce(new Error("no base branch"))
+      .mockResolvedValueOnce("diff --git a/fallback.ts");
+    mockChat.mockResolvedValue({
+      content: "## Suggestions\n- Minor improvement",
+      usage: { inputTokens: 50, outputTokens: 25 },
+    });
+
+    const cmd = makeReviewCommand();
+    await cmd.parseAsync(["node", "test", "001"]);
+
+    expect(mockGetDiff).toHaveBeenCalledTimes(2);
+    expect(mockChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("should exit when diff is empty", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { powerful: "opus" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue({ features: { "001-auth": {} } });
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockGetDiff.mockResolvedValue("");
+
+    const cmd = makeReviewCommand();
+    await expect(cmd.parseAsync(["node", "test", "001"])).rejects.toThrow("process.exit");
+    expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  it("should not warn when review has no critical findings", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { powerful: "opus" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue({ features: { "001-auth": {} } });
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockGetDiff.mockResolvedValue("diff --git a/file.ts");
+    mockChat.mockResolvedValue({
+      content: "## Critical\nNo critical issues found.\n## Suggestions\n- Minor fix",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+
+    const cmd = makeReviewCommand();
+    await cmd.parseAsync(["node", "test", "001"]);
+
+    expect(p.log.warn).not.toHaveBeenCalled();
+  });
+
   it("should handle LLM error and return early", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockReadConfig.mockResolvedValue({ models: { powerful: "opus" }, contextMode: "normal" } as any);
