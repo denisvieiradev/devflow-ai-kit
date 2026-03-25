@@ -7,7 +7,7 @@ import { readConfig } from "../../core/config.js";
 import { readState, writeState, updatePhase } from "../../core/state.js";
 import { resolveFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import { checkDrift } from "../../core/drift.js";
@@ -51,6 +51,7 @@ export function makeTasksCommand(): Command {
       if (await fileExists(prdPath)) {
         prdContent = await readFile(prdPath, "utf-8");
       }
+      validateApiKey();
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("tasks");
       const contextBuilder = new ContextBuilder();
@@ -62,9 +63,11 @@ export function makeTasksCommand(): Command {
       }
       const context = contextBuilder.build(docs, config.contextMode);
       const spinner = ora();
-      spinner.start("Generating tasks...");
-      const response = await provider.chat({
-        systemPrompt: `You are a senior developer. Decompose the tech spec into implementable tasks.
+      let response;
+      try {
+        spinner.start("Generating tasks...");
+        response = await provider.chat({
+          systemPrompt: `You are a senior developer. Decompose the tech spec into implementable tasks.
 
 Output format:
 1. First, output a tasks summary in this exact format (one task per line):
@@ -85,10 +88,14 @@ Output format:
 \`\`\`
 
 Tasks should be ordered by dependency. Each task should be independently implementable and testable.`,
-        messages: [{ role: "user", content: context }],
-        model: tier,
-      });
-      spinner.stop();
+          messages: [{ role: "user", content: context }],
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const content = response.content;
       const tasksListMatch = content.match(/```tasks\n([\s\S]*?)```/);
       const tasksList = tasksListMatch ? tasksListMatch[1]!.trim() : content;

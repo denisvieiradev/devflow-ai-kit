@@ -7,7 +7,7 @@ import { readConfig } from "../../core/config.js";
 import { readState, writeState, updatePhase } from "../../core/state.js";
 import { resolveFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import * as git from "../../infra/git.js";
@@ -57,13 +57,16 @@ export function makeReviewCommand(): Command {
           priority: "medium",
         });
       }
+      validateApiKey();
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("review");
       const contextBuilder = new ContextBuilder();
       const context = contextBuilder.build(docs, config.contextMode);
       const spinner = ora();
-      spinner.start("Reviewing code...");
-      const response = await provider.chat({
+      let response;
+      try {
+        spinner.start("Reviewing code...");
+        response = await provider.chat({
         systemPrompt: `You are a senior code reviewer. Analyze the diff and produce a code review with findings in these categories:
 
 ## Critical
@@ -82,9 +85,13 @@ For each finding, include:
 
 End with a summary: total findings count per category and overall recommendation (approve, request changes).`,
         messages: [{ role: "user", content: context }],
-        model: tier,
-      });
-      spinner.stop();
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const reviewPath = join(featurePath, "review.md");
       await writeFile(reviewPath, response.content, "utf-8");
       p.log.success(`Review saved: ${reviewPath}`);

@@ -2,7 +2,7 @@ import { Command } from "commander";
 import * as p from "@clack/prompts";
 import ora from "ora";
 import { readConfig } from "../../core/config.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import * as git from "../../infra/git.js";
 
@@ -23,11 +23,14 @@ export function makeCommitCommand(): Command {
         p.cancel("No staged changes. Use `git add` first.");
         process.exit(1);
       }
+      validateApiKey();
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("commit");
       const spinner = ora();
-      spinner.start("Analyzing changes...");
-      const response = await provider.chat({
+      let response;
+      try {
+        spinner.start("Analyzing changes...");
+        response = await provider.chat({
         systemPrompt: `You are a developer writing commit messages. Analyze the git diff and generate a conventional commit message.
 
 Rules:
@@ -38,9 +41,13 @@ Rules:
 - Do NOT mention AI, Claude, generated, LLM, or copilot
 - Return ONLY the commit message, nothing else`,
         messages: [{ role: "user", content: diff }],
-        model: tier,
-      });
-      spinner.stop();
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const commitMessage = response.content.trim();
       p.log.info(`Commit message: ${commitMessage}`);
       const confirm = await p.confirm({

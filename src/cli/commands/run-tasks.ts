@@ -7,7 +7,7 @@ import { readConfig } from "../../core/config.js";
 import { readState, writeState, updatePhase, completeTask } from "../../core/state.js";
 import { resolveFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import * as git from "../../infra/git.js";
@@ -62,6 +62,7 @@ export function makeRunTasksCommand(): Command {
       if (await fileExists(techspecPath)) {
         techspecContent = await readFile(techspecPath, "utf-8");
       }
+      validateApiKey();
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("run-tasks");
       const spinner = ora();
@@ -81,13 +82,19 @@ export function makeRunTasksCommand(): Command {
           docs.push({ name: "Tech Spec", content: techspecContent, priority: "medium" });
         }
         const context = contextBuilder.build(docs, config.contextMode);
-        spinner.start(`Executing task ${task.number}...`);
-        const response = await provider.chat({
-          systemPrompt: `You are a senior developer implementing a task. Based on the task description and tech spec, describe what code changes need to be made. Be specific about file paths, function signatures, and implementation details.`,
-          messages: [{ role: "user", content: context }],
-          model: tier,
-        });
-        spinner.stop();
+        let response;
+        try {
+          spinner.start(`Executing task ${task.number}...`);
+          response = await provider.chat({
+            systemPrompt: `You are a senior developer implementing a task. Based on the task description and tech spec, describe what code changes need to be made. Be specific about file paths, function signatures, and implementation details.`,
+            messages: [{ role: "user", content: context }],
+            model: tier,
+          });
+          spinner.stop();
+        } catch (err) {
+          spinner.stop();
+          handleLLMError(err);
+        }
         const outputPath = join(featurePath, `${task.number}_output.md`);
         await writeFile(outputPath, response.content, "utf-8");
         state = completeTask(state, featureRef, task.number);

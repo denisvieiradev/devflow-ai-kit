@@ -9,7 +9,7 @@ import { readConfig } from "../../core/config.js";
 import { readState, writeState, updatePhase } from "../../core/state.js";
 import { resolveFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 
@@ -51,13 +51,16 @@ export function makeTestCommand(): Command {
         p.cancel("No PRD or tech spec found. Cannot generate tests.");
         process.exit(1);
       }
+      validateApiKey();
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("test");
       const contextBuilder = new ContextBuilder();
       const context = contextBuilder.build(docs, config.contextMode);
       const spinner = ora();
-      spinner.start("Generating test plan...");
-      const response = await provider.chat({
+      let response;
+      try {
+        spinner.start("Generating test plan...");
+        response = await provider.chat({
         systemPrompt: `You are a QA engineer. Based on the PRD and tech spec, generate a comprehensive test plan with test cases. Include:
 1. Unit test suggestions with file paths and test descriptions
 2. Integration test suggestions
@@ -66,9 +69,13 @@ export function makeTestCommand(): Command {
 
 Format as Markdown with clear sections.`,
         messages: [{ role: "user", content: context }],
-        model: tier,
-      });
-      spinner.stop();
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const testPlanPath = join(featurePath, "test-plan.md");
       await writeFile(testPlanPath, response.content, "utf-8");
       p.log.success(`Test plan saved: ${testPlanPath}`);

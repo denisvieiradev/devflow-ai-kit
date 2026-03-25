@@ -8,7 +8,7 @@ import { readState, writeState, addFeature, updatePhase, setArtifact } from "../
 import { getNextFeatureNumber, generateSlug, formatFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { TemplateEngine } from "../../core/template.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { ensureDir } from "../../infra/filesystem.js";
 import type { FeatureState } from "../../core/types.js";
@@ -26,24 +26,30 @@ export function makePrdCommand(): Command {
         p.cancel("No config found. Run `devflow init` first.");
         process.exit(1);
       }
+      validateApiKey();
       let state = await readState(cwd);
       const number = getNextFeatureNumber(state);
       const slug = generateSlug(description);
       const featureRef = formatFeatureRef(number, slug);
       const featurePath = getFeaturePath(cwd, featureRef);
-      await ensureDir(featurePath);
       p.log.info(`Feature: ${featureRef}`);
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("prd");
       const spinner = ora();
-      spinner.start("Generating clarification questions...");
-      const clarificationResponse = await provider.chat({
-        systemPrompt:
-          "You are a product manager. Given a feature description, generate 3-5 clarification questions to ask before writing a PRD. Return only the numbered questions, nothing else.",
-        messages: [{ role: "user", content: description }],
-        model: tier,
-      });
-      spinner.stop();
+      let clarificationResponse;
+      try {
+        spinner.start("Generating clarification questions...");
+        clarificationResponse = await provider.chat({
+          systemPrompt:
+            "You are a product manager. Given a feature description, generate 3-5 clarification questions to ask before writing a PRD. Return only the numbered questions, nothing else.",
+          messages: [{ role: "user", content: description }],
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const questions = clarificationResponse.content;
       p.log.message(questions);
       const answers = await p.text({
@@ -63,16 +69,19 @@ export function makePrdCommand(): Command {
         { name: "Template", content: template, priority: "medium" },
       ];
       const context = contextBuilder.build(docs, config.contextMode);
-      spinner.start("Generating PRD...");
-      const prdResponse = await provider.chat({
-        systemPrompt: `You are a senior product manager. Generate a complete PRD in Markdown format based on the provided context. Use the template structure provided. Replace all {{variables}} with actual content. Be thorough and specific.`,
-        messages: [{ role: "user", content: context }],
-        model: tier,
-      });
-      spinner.stop();
-      const prdPath = `${featurePath}/prd.md`;
-      await writeFile(prdPath, prdResponse.content, "utf-8");
-      const hash = createHash("md5").update(prdResponse.content).digest("hex");
+      let prdResponse;
+      try {
+        spinner.start("Generating PRD...");
+        prdResponse = await provider.chat({
+          systemPrompt: `You are a senior product manager. Generate a complete PRD in Markdown format based on the provided context. Use the template structure provided. Replace all {{variables}} with actual content. Be thorough and specific.`,
+          messages: [{ role: "user", content: context }],
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const now = new Date().toISOString();
       const feature: FeatureState = {
         slug,
@@ -84,14 +93,18 @@ export function makePrdCommand(): Command {
         updatedAt: now,
       };
       state = addFeature(state, featureRef, feature);
+      const hash = createHash("sha256").update(prdResponse.content).digest("hex");
       state = setArtifact(state, featureRef, "prd", {
-        path: `.devflow/features/${featureRef}/prd.md`,
+        path: getFeaturePath("", featureRef) + "/prd.md",
         createdAt: now,
         updatedAt: now,
         hash,
       });
       state = updatePhase(state, featureRef, "prd_created");
       await writeState(cwd, state);
+      await ensureDir(featurePath);
+      const prdPath = `${featurePath}/prd.md`;
+      await writeFile(prdPath, prdResponse.content, "utf-8");
       p.log.success(`PRD saved: ${prdPath}`);
       p.outro(`Tokens used: ${prdResponse.usage.inputTokens} in / ${prdResponse.usage.outputTokens} out`);
     });

@@ -9,7 +9,7 @@ import { readState, writeState, updatePhase, setArtifact } from "../../core/stat
 import { resolveFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { TemplateEngine } from "../../core/template.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import { checkDrift } from "../../core/drift.js";
@@ -46,6 +46,7 @@ export function makeTechspecCommand(): Command {
         p.cancel(`PRD not found at ${prdPath}. Run \`devflow prd\` first.`);
         process.exit(1);
       }
+      validateApiKey();
       const prdContent = await readFile(prdPath, "utf-8");
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("techspec");
@@ -58,16 +59,22 @@ export function makeTechspecCommand(): Command {
       ];
       const context = contextBuilder.build(docs, config.contextMode);
       const spinner = ora();
-      spinner.start("Generating tech spec...");
-      const response = await provider.chat({
-        systemPrompt: `You are a senior software architect. Generate a detailed technical specification in Markdown based on the PRD provided. Use the template structure as a guide. Include architecture decisions, interfaces, data models, sequencing, and testing strategy. Be thorough and specific.`,
-        messages: [{ role: "user", content: context }],
-        model: tier,
-      });
-      spinner.stop();
+      let response;
+      try {
+        spinner.start("Generating tech spec...");
+        response = await provider.chat({
+          systemPrompt: `You are a senior software architect. Generate a detailed technical specification in Markdown based on the PRD provided. Use the template structure as a guide. Include architecture decisions, interfaces, data models, sequencing, and testing strategy. Be thorough and specific.`,
+          messages: [{ role: "user", content: context }],
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const techspecPath = join(featurePath, "techspec.md");
       await writeFile(techspecPath, response.content, "utf-8");
-      const hash = createHash("md5").update(response.content).digest("hex");
+      const hash = createHash("sha256").update(response.content).digest("hex");
       const now = new Date().toISOString();
       state = setArtifact(state, featureRef, "techspec", {
         path: `.devflow/features/${featureRef}/techspec.md`,

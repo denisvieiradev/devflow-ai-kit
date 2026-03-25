@@ -4,7 +4,7 @@ import ora from "ora";
 import { readConfig } from "../../core/config.js";
 import { readState, writeState, updatePhase } from "../../core/state.js";
 import { resolveFeatureRef } from "../../core/pipeline.js";
-import { ClaudeProvider } from "../../providers/claude.js";
+import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import * as git from "../../infra/git.js";
 import { isGhAvailable, createPR } from "../../infra/github.js";
@@ -33,11 +33,14 @@ export function makePrCommand(): Command {
         p.cancel("No commits found on this branch relative to base.");
         process.exit(1);
       }
+      validateApiKey();
       const provider = new ClaudeProvider(config);
       const tier = resolveModelTier("pr");
       const spinner = ora();
-      spinner.start("Generating PR title and description...");
-      const response = await provider.chat({
+      let response;
+      try {
+        spinner.start("Generating PR title and description...");
+        response = await provider.chat({
         systemPrompt: `You are a developer creating a pull request. Based on the commit log, generate a PR title and description.
 
 Output format (nothing else):
@@ -51,10 +54,14 @@ TITLE: <concise title, max 70 chars>
 
 ## Test Plan
 <testing checklist>`,
-        messages: [{ role: "user", content: `Branch: ${currentBranch}\n\nCommits:\n${commits}` }],
-        model: tier,
-      });
-      spinner.stop();
+          messages: [{ role: "user", content: `Branch: ${currentBranch}\n\nCommits:\n${commits}` }],
+          model: tier,
+        });
+        spinner.stop();
+      } catch (err) {
+        spinner.stop();
+        handleLLMError(err);
+      }
       const content = response.content;
       const titleMatch = content.match(/^TITLE:\s*(.+)$/m);
       const title = titleMatch ? titleMatch[1]!.trim() : currentBranch;
