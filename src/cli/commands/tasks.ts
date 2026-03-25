@@ -95,6 +95,7 @@ Tasks should be ordered by dependency. Each task should be independently impleme
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const content = response.content;
       // Pattern 1: ```tasks fenced block

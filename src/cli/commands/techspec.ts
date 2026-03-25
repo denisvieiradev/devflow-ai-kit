@@ -71,6 +71,7 @@ export function makeTechspecCommand(): Command {
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const techspecPath = join(featurePath, "techspec.md");
       await writeFile(techspecPath, response.content, "utf-8");

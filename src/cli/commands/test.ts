@@ -75,6 +75,7 @@ Format as Markdown with clear sections.`,
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const testPlanPath = join(featurePath, "test-plan.md");
       await writeFile(testPlanPath, response.content, "utf-8");

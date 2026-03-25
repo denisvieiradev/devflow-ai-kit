@@ -47,6 +47,7 @@ Rules:
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const commitMessage = response.content.trim();
       p.log.info(`Commit message: ${commitMessage}`);

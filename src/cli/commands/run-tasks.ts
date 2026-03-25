@@ -94,6 +94,7 @@ export function makeRunTasksCommand(): Command {
         } catch (err) {
           spinner.stop();
           handleLLMError(err);
+          return;
         }
         const outputPath = join(featurePath, `${task.number}_output.md`);
         await writeFile(outputPath, response.content, "utf-8");

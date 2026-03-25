@@ -91,6 +91,7 @@ End with a summary: total findings count per category and overall recommendation
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const reviewPath = join(featurePath, "review.md");
       await writeFile(reviewPath, response.content, "utf-8");

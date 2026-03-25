@@ -59,6 +59,7 @@ export function makePrdCommand(): Command {
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const questions = clarificationResponse.content;
       p.log.message(questions);
@@ -91,6 +92,7 @@ export function makePrdCommand(): Command {
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const now = new Date().toISOString();
       const feature: FeatureState = {

@@ -61,6 +61,7 @@ TITLE: <concise title, max 70 chars>
       } catch (err) {
         spinner.stop();
         handleLLMError(err);
+        return;
       }
       const content = response.content;
       const titleMatch = content.match(/^TITLE:\s*(.+)$/m);
