@@ -100,8 +100,13 @@ export function makeRunTasksCommand(): Command {
             const log = await git.getLog(cwd, undefined, 1);
             p.log.success(`Task ${task.number} done — ${log}`);
           }
-        } catch {
-          p.log.info(`Task ${task.number} done (no changes to commit)`);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.includes("nothing to commit") || message.includes("no changes added")) {
+            p.log.info(`Task ${task.number} done (no changes to commit)`);
+          } else {
+            p.log.warn(`Task ${task.number} done but git operation failed: ${message}`);
+          }
         }
       }
       p.outro(`All ${pendingTasks.length} tasks completed.`);

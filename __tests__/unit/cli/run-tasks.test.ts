@@ -71,6 +71,7 @@ import { readState, completeTask } from "../../../src/core/state.js";
 import { resolveFeatureRef } from "../../../src/core/pipeline.js";
 import { handleLLMError } from "../../../src/providers/claude.js";
 import * as git from "../../../src/infra/git.js";
+import * as p from "@clack/prompts";
 import { makeRunTasksCommand } from "../../../src/cli/commands/run-tasks.js";
 
 const mockReadConfig = readConfig as jest.MockedFunction<typeof readConfig>;
@@ -271,5 +272,49 @@ describe("run-tasks command", () => {
     await cmd.parseAsync(["node", "test", "001"]);
 
     expect(mockUpdatePhase).not.toHaveBeenCalled();
+  });
+
+  it("should log info when git error is 'nothing to commit'", async () => {
+    const feature = makeFeature({
+      tasks: [{ number: 1, title: "Setup", completed: false }],
+    });
+    const state = { features: { "001-auth": feature } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { balanced: "sonnet" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue(state);
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockCompleteTask.mockReturnValue(state);
+    mockChat.mockResolvedValue({
+      content: "done",
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockGetChangedFiles.mockRejectedValue(new Error("nothing to commit, working tree clean"));
+
+    const cmd = makeRunTasksCommand();
+    await cmd.parseAsync(["node", "test", "001"]);
+
+    expect(p.log.info).toHaveBeenCalledWith(expect.stringContaining("no changes to commit"));
+  });
+
+  it("should log warning when git error is a real failure", async () => {
+    const feature = makeFeature({
+      tasks: [{ number: 1, title: "Setup", completed: false }],
+    });
+    const state = { features: { "001-auth": feature } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { balanced: "sonnet" }, contextMode: "normal" } as any);
+    mockReadState.mockResolvedValue(state);
+    mockResolveFeatureRef.mockResolvedValue("001-auth");
+    mockCompleteTask.mockReturnValue(state);
+    mockChat.mockResolvedValue({
+      content: "done",
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockGetChangedFiles.mockRejectedValue(new Error("fatal: permission denied"));
+
+    const cmd = makeRunTasksCommand();
+    await cmd.parseAsync(["node", "test", "001"]);
+
+    expect(p.log.warn).toHaveBeenCalledWith(expect.stringContaining("git operation failed"));
   });
 });
