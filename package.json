@@ -1,6 +1,6 @@
 {
   "name": "devflow-ai-kit",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "CLI pipeline for structured software development — from PRD to merge",
   "type": "module",
   "bin": {
@@ -15,7 +15,8 @@
     "dev": "tsup --watch",
     "test": "node --experimental-vm-modules node_modules/.bin/jest --passWithNoTests",
     "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage --passWithNoTests",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run lint && npm test && npm run build"
   },
   "keywords": [
     "cli",
@@ -26,8 +27,16 @@
     "code-review",
     "ai"
   ],
-  "author": "",
+  "author": "Denis Vieira <denisvieira05@gmail.com> (https://github.com/denisvieiradev)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/denisvieiradev/devflow-ai-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/denisvieiradev/devflow-ai-kit/issues"
+  },
+  "homepage": "https://github.com/denisvieiradev/devflow-ai-kit#readme",
   "engines": {
     "node": ">=18"
   },
