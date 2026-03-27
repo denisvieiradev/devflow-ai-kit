@@ -37,3 +37,31 @@ export async function createPR(params: CreatePRParams): Promise<PRResult> {
   }
   return { url };
 }
+
+export interface CreateReleaseParams {
+  tag: string;
+  title: string;
+  body: string;
+  cwd: string;
+}
+
+export async function createGitHubRelease(
+  params: CreateReleaseParams,
+): Promise<PRResult> {
+  debug("Creating GitHub release via gh", { tag: params.tag });
+  const args = [
+    "release",
+    "create",
+    params.tag,
+    "--title",
+    params.title,
+    "--notes",
+    params.body,
+  ];
+  const result = await exec("gh", args, { cwd: params.cwd });
+  const url = result.stdout?.trim();
+  if (!url) {
+    throw new Error("gh release create returned empty output — check gh auth status");
+  }
+  return { url };
+}

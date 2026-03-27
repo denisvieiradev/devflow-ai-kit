@@ -10,6 +10,7 @@ const COMMAND_TIER_MAP: Record<string, ModelTier> = {
   review: "powerful",
   commit: "fast",
   pr: "fast",
+  release: "balanced",
   done: "fast",
   status: "fast",
 };

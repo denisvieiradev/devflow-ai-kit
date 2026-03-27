@@ -46,6 +46,7 @@ export type Phase =
   | "testing"
   | "reviewing"
   | "pr_created"
+  | "releasing"
   | "done";
 
 export interface PhaseInfo {
@@ -61,7 +62,8 @@ export const PHASE_CONFIG: Record<Phase, PhaseInfo> = {
   in_progress: { label: "In Progress", nextStep: "devflow test <ref>" },
   testing: { label: "Testing", nextStep: "devflow review <ref>" },
   reviewing: { label: "Reviewing", nextStep: "devflow pr <ref>" },
-  pr_created: { label: "PR Created", nextStep: "devflow done <ref>" },
+  pr_created: { label: "PR Created", nextStep: "devflow release <ref>" },
+  releasing: { label: "Releasing", nextStep: "devflow done <ref>" },
   done: { label: "Done", nextStep: "Complete" },
 };
 
