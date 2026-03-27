@@ -93,3 +93,71 @@ export async function getChangedFiles(cwd: string): Promise<string[]> {
     .map((line) => line.slice(3).trim())
     .filter((file) => file.length > 0);
 }
+
+export interface ChangedFile {
+  file: string;
+  indexStatus: string;
+  workTreeStatus: string;
+}
+
+export async function parseStatus(cwd: string): Promise<ChangedFile[]> {
+  const output = await run(["status", "--porcelain"], cwd);
+  if (!output) return [];
+  return output
+    .split("\n")
+    .filter((line) => line.length >= 3)
+    .map((line) => ({
+      file: line.slice(3).trim(),
+      indexStatus: line[0] as string,
+      workTreeStatus: line[1] as string,
+    }))
+    .filter((entry) => entry.file.length > 0);
+}
+
+export async function getStagedFiles(cwd: string): Promise<ChangedFile[]> {
+  const files = await parseStatus(cwd);
+  return files.filter((f) => f.indexStatus !== " " && f.indexStatus !== "?");
+}
+
+export async function resetStaged(cwd: string): Promise<void> {
+  await run(["reset", "HEAD"], cwd);
+}
+
+export async function getStagedFilesList(cwd: string): Promise<string[]> {
+  const output = await run(["diff", "--cached", "--name-only"], cwd);
+  if (!output) return [];
+  return output.split("\n").filter((f) => f.length > 0);
+}
+
+export async function getUnstagedFiles(cwd: string): Promise<ChangedFile[]> {
+  const files = await parseStatus(cwd);
+  return files.filter(
+    (f) =>
+      (f.indexStatus === "?" && f.workTreeStatus === "?") ||
+      f.workTreeStatus !== " ",
+  );
+}
+
+export async function getLatestTag(cwd: string): Promise<string | null> {
+  try {
+    return await run(["describe", "--tags", "--abbrev=0"], cwd);
+  } catch {
+    return null;
+  }
+}
+
+export async function createTag(
+  cwd: string,
+  tag: string,
+  message: string,
+): Promise<void> {
+  await run(["tag", "-a", tag, "-m", message], cwd);
+}
+
+export async function pushWithTags(
+  cwd: string,
+  remote: string,
+  branch: string,
+): Promise<void> {
+  await run(["push", remote, branch, "--follow-tags"], cwd);
+}

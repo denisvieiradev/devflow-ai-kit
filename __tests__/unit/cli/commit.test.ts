@@ -11,12 +11,20 @@ const mockHandleLLMError = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockGetStagedDiff = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetStagedFilesList = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockGitCommit = jest.fn<any>();
 const mockGetBranch = jest.fn<() => Promise<string>>().mockResolvedValue("feature/test");
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockPush = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockResetStaged = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAdd = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockConfirm = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockSelect = jest.fn<any>();
 
 jest.unstable_mockModule("../../../src/core/config.js", () => ({
   readConfig: mockReadConfig,
@@ -36,9 +44,24 @@ jest.unstable_mockModule("../../../src/providers/model-router.js", () => ({
 
 jest.unstable_mockModule("../../../src/infra/git.js", () => ({
   getStagedDiff: mockGetStagedDiff,
+  getStagedFilesList: mockGetStagedFilesList,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getStagedFiles: jest.fn<any>().mockResolvedValue([]),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getUnstagedFiles: jest.fn<any>().mockResolvedValue([]),
   commit: mockGitCommit,
   getBranch: mockGetBranch,
   push: mockPush,
+  add: mockAdd,
+  resetStaged: mockResetStaged,
+}));
+
+jest.unstable_mockModule("chalk", () => ({
+  default: {
+    green: (s: string) => s,
+    cyan: (s: string) => s,
+    bold: (s: string) => s,
+  },
 }));
 
 jest.unstable_mockModule("@clack/prompts", () => ({
@@ -47,6 +70,7 @@ jest.unstable_mockModule("@clack/prompts", () => ({
   outro: jest.fn(),
   log: { info: jest.fn(), success: jest.fn(), message: jest.fn() },
   confirm: mockConfirm,
+  select: mockSelect,
   isCancel: () => false,
 }));
 
@@ -60,6 +84,7 @@ describe("commit command", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfirm.mockResolvedValue(true);
+    mockGetStagedFilesList.mockResolvedValue(["file.ts"]);
   });
 
   it("should exit when no config found", async () => {
@@ -78,12 +103,12 @@ describe("commit command", () => {
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 
-  it("should generate commit message and commit on confirmation", async () => {
+  it("should generate single commit message and commit on confirmation", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
     mockGetStagedDiff.mockResolvedValue("diff --git a/file.ts");
     mockChat.mockResolvedValue({
-      content: "feat(core): add new feature",
+      content: '{"type": "single", "message": "feat(core): add new feature"}',
       usage: { inputTokens: 10, outputTokens: 5 },
     });
     mockConfirm.mockResolvedValue(true);
@@ -99,12 +124,93 @@ describe("commit command", () => {
     );
   });
 
+  it("should handle raw commit message (non-JSON fallback)", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
+    mockGetStagedDiff.mockResolvedValue("diff --git a/file.ts");
+    mockChat.mockResolvedValue({
+      content: "feat(core): add new feature",
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockConfirm.mockResolvedValue(true);
+    mockGitCommit.mockResolvedValue("abc1234");
+
+    const cmd = makeCommitCommand();
+    await cmd.parseAsync(["node", "test"]);
+
+    expect(mockGitCommit).toHaveBeenCalledWith(
+      expect.any(String),
+      "feat(core): add new feature",
+    );
+  });
+
+  it("should show commit plan and split into separate commits", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
+    mockGetStagedDiff.mockResolvedValue("diff --git a/auth.ts\ndiff --git a/db.ts");
+    mockGetStagedFilesList.mockResolvedValue(["src/auth.ts", "src/db.ts"]);
+    mockChat.mockResolvedValue({
+      content: JSON.stringify({
+        type: "plan",
+        commits: [
+          { message: "feat(auth): add login endpoint", files: ["src/auth.ts"] },
+          { message: "fix(db): resolve connection timeout", files: ["src/db.ts"] },
+        ],
+      }),
+      usage: { inputTokens: 20, outputTokens: 10 },
+    });
+    mockSelect.mockResolvedValue("split");
+    mockResetStaged.mockResolvedValue(undefined);
+    mockAdd.mockResolvedValue(undefined);
+    mockGitCommit.mockResolvedValue("abc1234");
+
+    const cmd = makeCommitCommand();
+    await cmd.parseAsync(["node", "test"]);
+
+    expect(mockResetStaged).toHaveBeenCalledWith(expect.any(String));
+    expect(mockAdd).toHaveBeenCalledTimes(2);
+    expect(mockAdd).toHaveBeenCalledWith(expect.any(String), ["src/auth.ts"]);
+    expect(mockAdd).toHaveBeenCalledWith(expect.any(String), ["src/db.ts"]);
+    expect(mockGitCommit).toHaveBeenCalledTimes(2);
+    expect(mockGitCommit).toHaveBeenCalledWith(expect.any(String), "feat(auth): add login endpoint");
+    expect(mockGitCommit).toHaveBeenCalledWith(expect.any(String), "fix(db): resolve connection timeout");
+  });
+
+  it("should show commit plan and commit all as single when chosen", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
+    mockGetStagedDiff.mockResolvedValue("diff --git a/auth.ts\ndiff --git a/db.ts");
+    mockGetStagedFilesList.mockResolvedValue(["src/auth.ts", "src/db.ts"]);
+    mockChat.mockResolvedValue({
+      content: JSON.stringify({
+        type: "plan",
+        commits: [
+          { message: "feat(auth): add login endpoint", files: ["src/auth.ts"] },
+          { message: "fix(db): resolve connection timeout", files: ["src/db.ts"] },
+        ],
+      }),
+      usage: { inputTokens: 20, outputTokens: 10 },
+    });
+    mockSelect.mockResolvedValue("single");
+    mockGitCommit.mockResolvedValue("abc1234");
+
+    const cmd = makeCommitCommand();
+    await cmd.parseAsync(["node", "test"]);
+
+    expect(mockResetStaged).not.toHaveBeenCalled();
+    expect(mockGitCommit).toHaveBeenCalledTimes(1);
+    expect(mockGitCommit).toHaveBeenCalledWith(
+      expect.any(String),
+      "feat(auth): add login endpoint\nfix(db): resolve connection timeout",
+    );
+  });
+
   it("should exit when user cancels confirmation", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
     mockGetStagedDiff.mockResolvedValue("diff --git a/file.ts");
     mockChat.mockResolvedValue({
-      content: "feat: something",
+      content: '{"type": "single", "message": "feat: something"}',
       usage: { inputTokens: 10, outputTokens: 5 },
     });
     mockConfirm.mockResolvedValue(false);
