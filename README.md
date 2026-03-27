@@ -3,9 +3,13 @@
 **CLI pipeline for structured software development — from PRD to merge.**
 
 [![npm version](https://img.shields.io/npm/v/devflow-ai-kit)](https://www.npmjs.com/package/devflow-ai-kit)
+[![npm downloads](https://img.shields.io/npm/dm/devflow-ai-kit)](https://www.npmjs.com/package/devflow-ai-kit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org)
+[![CI](https://github.com/denisvieiradev/devflow-ai-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/denisvieiradev/devflow-ai-kit/actions/workflows/ci.yml)
+
+> **Available on npm:** [devflow-ai-kit](https://www.npmjs.com/package/devflow-ai-kit)
 
 ---
 
@@ -37,7 +41,7 @@ init → prd → techspec → tasks → run-tasks → test → review → pr →
 | [Node.js](https://nodejs.org) >= 18 | Runtime |
 | [Git](https://git-scm.com) | Version control operations |
 | [GitHub CLI (`gh`)](https://cli.github.com) | PR creation (optional — only for `devflow pr`) |
-| `ANTHROPIC_API_KEY` | LLM API access |
+| `ANTHROPIC_API_KEY` | LLM API access (configured during `devflow init` or via env var) |
 
 ## Installation
 
@@ -57,35 +61,32 @@ npx devflow <command>
 ## Quick Start
 
 ```bash
-# 1. Set your API key
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# 2. Initialize devflow in your project
+# 1. Initialize devflow in your project (configures API key, provider, and context mode)
 cd my-project
 devflow init
 
-# 3. Create a PRD from a feature description
+# 2. Create a PRD from a feature description
 devflow prd "add OAuth authentication with Google and GitHub providers"
 
-# 4. Generate a technical specification from the PRD
+# 3. Generate a technical specification from the PRD
 devflow techspec 001
 
-# 5. Break the techspec into implementable tasks
+# 4. Break the techspec into implementable tasks
 devflow tasks 001
 
-# 6. Execute all tasks with automatic commits
+# 5. Execute all tasks with automatic commits
 devflow run-tasks 001
 
-# 7. Generate and run tests
+# 6. Generate and run tests
 devflow test 001
 
-# 8. Run an automated code review
+# 7. Run an automated code review
 devflow review 001
 
-# 9. Create a pull request
+# 8. Create a pull request
 devflow pr
 
-# 10. Mark the feature as complete
+# 9. Mark the feature as complete
 devflow done 001
 ```
 
@@ -97,7 +98,7 @@ devflow done 001
 
 | Command | Description | Model Tier |
 |---|---|---|
-| `devflow init` | Initialize devflow in a project — auto-detects language, framework, tests, CI | — |
+| `devflow init` | Initialize devflow — auto-detects project, configures API key, provider, and context mode | — |
 | `devflow prd <description>` | Generate a structured PRD with interactive clarification questions | Sonnet |
 | `devflow techspec [ref]` | Generate technical specification from an approved PRD | Sonnet |
 | `devflow tasks [ref]` | Decompose techspec into numbered, implementable tasks | Sonnet |
@@ -111,7 +112,7 @@ devflow done 001
 
 | Command | Description | Model Tier |
 |---|---|---|
-| `devflow commit [--push]` | Generate intelligent commit messages from staged changes (Conventional Commits) | Haiku |
+| `devflow commit [--push]` | Generate intelligent commit messages with smart commit plan detection (Conventional Commits) | Haiku |
 | `devflow status` | Show status of all tracked features with phases and pending tasks | — |
 
 > `[ref]` is the feature number (e.g., `001`) or slug. If omitted, devflow resolves the current feature from context.
@@ -157,6 +158,7 @@ After running `devflow init`, your project gets a `.devflow/` directory:
 my-project/
 ├── .devflow/
 │   ├── config.json              # Provider, models, context mode, detection results
+│   ├── .env                     # API key (created by `devflow init`, never committed)
 │   ├── state.json               # Feature tracking (phases, tasks, artifact hashes)
 │   ├── templates/               # Optional: custom template overrides
 │   └── features/
@@ -175,6 +177,18 @@ my-project/
 ```
 
 ## Configuration
+
+### API Key
+
+During `devflow init`, you'll be prompted to enter your Anthropic API key. The key is stored in `.devflow/.env` (with `0600` permissions) and automatically loaded before every command.
+
+You can also set it via environment variable, which takes precedence over the file:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+> **Important:** Add `.devflow/.env` to your `.gitignore` to avoid committing secrets.
 
 ### config.json
 
@@ -256,15 +270,53 @@ devflow pr                                # Open PR for human review
 devflow done 001                          # After merge
 ```
 
-### Standalone Commit Helper
+### Manual Mode
 
-You can use `devflow commit` independently, without the full pipeline:
+You don't have to use the full pipeline. After running `devflow init`, you can pick and choose individual commands as standalone utilities — no feature reference or prior phases required.
 
 ```bash
-git add .
-devflow commit          # Generates smart commit message
-devflow commit --push   # Commit + push in one step
+devflow init                              # Once per project
+
+# Use only the commands you need:
+devflow commit                            # Smart commit messages anytime
+devflow commit --push                     # Commit + push in one step
+devflow review --base main                # AI code review on current branch
+devflow pr                                # Auto-generate PR title & description
+devflow status                            # Check feature progress
 ```
+
+Some examples of selective usage:
+
+- **Just commit smarter** — Use `devflow commit` as a drop-in replacement for `git commit`. It analyzes your staged diff and generates a Conventional Commits message automatically.
+- **Just get a code review** — Run `devflow review` on any branch to get AI-powered feedback categorized into Critical, Suggestions, and Nitpicks — without creating a feature or PRD.
+- **Just create a PR** — Run `devflow pr` to auto-generate a pull request with a title and description derived from your commit history.
+- **Just document a feature** — Run `devflow prd "your idea"` to generate a structured PRD for brainstorming or team discussion, without continuing to implementation.
+- **Check progress** — Run `devflow status` anytime to see all tracked features, their current phase, and pending tasks.
+
+#### Smart Commit Plan
+
+When your staged changes span **multiple contexts** (e.g., a bug fix and a new feature), devflow automatically detects this and suggests a **commit plan** — splitting changes into separate conventional commits:
+
+```
+devflow commit
+
+  Commit plan detected — changes span multiple contexts:
+
+  1. feat(auth): add login endpoint
+     Files: src/auth.ts, src/routes.ts
+
+  2. fix(db): resolve connection timeout
+     Files: src/db.ts
+
+? How would you like to proceed?
+  > Split into separate commits (recommended)
+    Commit all as a single commit
+    Cancel
+```
+
+For cohesive, single-context changes, devflow generates a single conventional commit message as usual — no commit plan is shown.
+
+Supported conventional commit types: `feat`, `fix`, `refactor`, `test`, `chore`, `style`, `docs`.
 
 ## Project Structure (for Contributors)
 
@@ -289,6 +341,7 @@ src/
 │   ├── claude.ts             # Anthropic SDK implementation
 │   └── model-router.ts       # Model selection by task complexity
 ├── infra/
+│   ├── env.ts                # .devflow/.env loading and writing
 │   ├── filesystem.ts         # File operations (read/write JSON, existence checks)
 │   ├── git.ts                # Git operations wrapper
 │   ├── github.ts             # GitHub PR creation via gh CLI
@@ -303,33 +356,13 @@ src/
 
 ## Contributing
 
-Contributions are welcome! Here's how to get started:
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details on setup, development workflow, and guidelines.
 
-### Setup
+By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-```bash
-git clone https://github.com/denisvieiradev/devflow-ai-kit.git
-cd devflow-ai-kit
-npm install
-```
+## Security
 
-### Development
-
-```bash
-npm run dev          # Watch mode (rebuilds on changes)
-npm run build        # Production build
-npm run lint         # Type checking (tsc --noEmit)
-npm test             # Run tests
-npm run test:coverage  # Tests with coverage report
-```
-
-### Guidelines
-
-- Write TypeScript (strict mode)
-- Follow Conventional Commits for commit messages
-- Add tests for new commands and core logic
-- Keep PRs focused — one feature or fix per PR
-- Update this README if you add new commands or change behavior
+To report a vulnerability, please see our [Security Policy](SECURITY.md).
 
 ## Roadmap
 
@@ -341,6 +374,13 @@ npm run test:coverage  # Tests with coverage report
 - [ ] Parallel task execution
 - [ ] Web dashboard for feature tracking
 - [ ] Monorepo support
+
+## Support the Developer
+
+If you find devflow-ai-kit useful, consider supporting its development:
+
+- [Buy me a coffee](https://buymeacoffee.com/denisvieiradev)
+- **PIX (Brazil):** `denisvieira05@gmail.com`
 
 ## License
 
