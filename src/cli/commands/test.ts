@@ -8,7 +8,8 @@ import { promisify } from "node:util";
 import { writeState, updatePhase } from "../../core/state.js";
 import { getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import { withFeatureContext } from "../context.js";
@@ -38,8 +39,8 @@ export function makeTestCommand(): Command {
         p.cancel("No PRD or tech spec found. Cannot generate tests.");
         process.exit(1);
       }
-      validateApiKey();
-      const provider = new ClaudeProvider(config);
+      validateProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("test");
       const contextBuilder = new ContextBuilder();
       const context = contextBuilder.build(docs, config.contextMode);

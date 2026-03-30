@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { writeState, updatePhase } from "../../core/state.js";
 import { getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import { checkDrift } from "../../core/drift.js";
@@ -38,8 +39,8 @@ export function makeTasksCommand(): Command {
       if (await fileExists(prdPath)) {
         prdContent = await readFile(prdPath, "utf-8");
       }
-      validateApiKey();
-      const provider = new ClaudeProvider(config);
+      validateProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("tasks");
       const contextBuilder = new ContextBuilder();
       const docs: Document[] = [

@@ -8,7 +8,8 @@ import { writeState, updatePhase, setArtifact } from "../../core/state.js";
 import { getFeaturePath } from "../../core/pipeline.js";
 import { TemplateEngine } from "../../core/template.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import { checkDrift } from "../../core/drift.js";
@@ -33,9 +34,9 @@ export function makeTechspecCommand(): Command {
         p.cancel(`PRD not found at ${prdPath}. Run \`devflow prd\` first.`);
         process.exit(1);
       }
-      validateApiKey();
+      validateProvider(config);
       const prdContent = await readFile(prdPath, "utf-8");
-      const provider = new ClaudeProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("techspec");
       const templateEngine = new TemplateEngine(config.templatesPath);
       const template = await templateEngine.load("techspec");

@@ -8,7 +8,8 @@ import { readConfig } from "../../core/config.js";
 import { readState, updatePhase, writeState } from "../../core/state.js";
 import { resolveFeatureRef } from "../../core/pipeline.js";
 import { TemplateEngine } from "../../core/template.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import * as git from "../../infra/git.js";
 import { isGhAvailable, createGitHubRelease } from "../../infra/github.js";
@@ -81,7 +82,7 @@ export function makeReleaseCommand(): Command {
         process.exit(1);
       }
 
-      validateApiKey();
+      validateProvider(config);
 
       // --- Resolve pipeline context (optional) ---
       let featureRef: string | undefined;
@@ -115,7 +116,7 @@ export function makeReleaseCommand(): Command {
       p.log.info(`Current version: ${chalk.cyan(currentVersion)}`);
 
       // --- AI: Suggest version bump ---
-      const provider = new ClaudeProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("release");
       const templateEngine = new TemplateEngine(
         join(cwd, config.templatesPath),

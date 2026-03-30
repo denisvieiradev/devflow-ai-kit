@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { writeState, updatePhase, completeTask } from "../../core/state.js";
 import { getFeaturePath } from "../../core/pipeline.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { fileExists } from "../../infra/filesystem.js";
 import * as git from "../../infra/git.js";
@@ -46,8 +47,8 @@ export function makeRunTasksCommand(): Command {
       if (await fileExists(techspecPath)) {
         techspecContent = await readFile(techspecPath, "utf-8");
       }
-      validateApiKey();
-      const provider = new ClaudeProvider(config);
+      validateProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("run-tasks");
       const spinner = ora();
       p.log.info(`${pendingTasks.length} pending tasks to execute.`);

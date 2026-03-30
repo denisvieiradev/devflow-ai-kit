@@ -6,8 +6,9 @@ import { readConfig, writeConfig } from "../../core/config.js";
 import { initState } from "../../core/state.js";
 import { scanProject } from "../../core/scanner.js";
 import { fileExists } from "../../infra/filesystem.js";
-import { DEFAULT_CONFIG, type ContextMode } from "../../core/types.js";
+import { DEFAULT_CONFIG, type ContextMode, type DevflowConfig } from "../../core/types.js";
 import { writeEnvVar } from "../../infra/env.js";
+import { validateClaudeCli } from "../../providers/claude-code.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -61,7 +62,8 @@ export function makeInitCommand(): Command {
       const provider = await p.select({
         message: "LLM Provider",
         options: [
-          { value: "claude" as const, label: "Claude (Anthropic)", hint: "default" },
+          { value: "claude-code-api-key" as const, label: "Claude (API Key)", hint: "requires Anthropic API key" },
+          { value: "claude-code-cli" as const, label: "Claude Code (CLI)", hint: "uses your Claude Code subscription" },
         ],
       });
       if (p.isCancel(provider)) {
@@ -80,51 +82,56 @@ export function makeInitCommand(): Command {
         process.exit(0);
       }
       let apiKey: string | undefined;
-      const existingKey = process.env.ANTHROPIC_API_KEY;
-      if (existingKey) {
-        const masked = existingKey.length > 8
-          ? `${existingKey.slice(0, 7)}...${existingKey.slice(-4)}`
-          : "****";
-        const keepKey = await p.confirm({
-          message: `ANTHROPIC_API_KEY already set (${masked}). Keep it?`,
-        });
-        if (p.isCancel(keepKey)) {
-          p.cancel("Init cancelled.");
-          process.exit(0);
-        }
-        if (!keepKey) {
-          const newKey = await p.password({
-            message: "Anthropic API Key",
-          });
-          if (p.isCancel(newKey)) {
-            p.cancel("Init cancelled.");
-            process.exit(0);
-          }
-          apiKey = newKey;
-        }
+      if (provider === "claude-code-cli") {
+        validateClaudeCli();
+        p.log.success("Claude Code CLI detected.");
       } else {
-        const wantsKey = await p.confirm({
-          message: "Configure Anthropic API Key now?",
-          initialValue: true,
-        });
-        if (p.isCancel(wantsKey)) {
-          p.cancel("Init cancelled.");
-          process.exit(0);
-        }
-        if (wantsKey) {
-          const newKey = await p.password({
-            message: "Anthropic API Key",
+        const existingKey = process.env.ANTHROPIC_API_KEY;
+        if (existingKey) {
+          const masked = existingKey.length > 8
+            ? `${existingKey.slice(0, 7)}...${existingKey.slice(-4)}`
+            : "****";
+          const keepKey = await p.confirm({
+            message: `ANTHROPIC_API_KEY already set (${masked}). Keep it?`,
           });
-          if (p.isCancel(newKey)) {
+          if (p.isCancel(keepKey)) {
             p.cancel("Init cancelled.");
             process.exit(0);
           }
-          apiKey = newKey;
+          if (!keepKey) {
+            const newKey = await p.password({
+              message: "Anthropic API Key",
+            });
+            if (p.isCancel(newKey)) {
+              p.cancel("Init cancelled.");
+              process.exit(0);
+            }
+            apiKey = newKey;
+          }
+        } else {
+          const wantsKey = await p.confirm({
+            message: "Configure Anthropic API Key now?",
+            initialValue: true,
+          });
+          if (p.isCancel(wantsKey)) {
+            p.cancel("Init cancelled.");
+            process.exit(0);
+          }
+          if (wantsKey) {
+            const newKey = await p.password({
+              message: "Anthropic API Key",
+            });
+            if (p.isCancel(newKey)) {
+              p.cancel("Init cancelled.");
+              process.exit(0);
+            }
+            apiKey = newKey;
+          }
         }
       }
       const config = {
         ...DEFAULT_CONFIG,
-        provider: provider as "claude",
+        provider: provider as DevflowConfig["provider"],
         contextMode: contextMode as ContextMode,
         project: scan,
       };

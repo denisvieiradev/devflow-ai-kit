@@ -1,5 +1,6 @@
 export interface DevflowConfig {
-  provider: "claude";
+  provider: "claude-code-api-key" | "claude-code-cli";
+  claudeCliPath?: string;
   models: {
     fast: string;
     balanced: string;
@@ -83,7 +84,7 @@ export interface TaskState {
 }
 
 export const DEFAULT_CONFIG: DevflowConfig = {
-  provider: "claude",
+  provider: "claude-code-api-key",
   models: {
     fast: "claude-haiku-4-5-20251001",
     balanced: "claude-sonnet-4-5-20250929",

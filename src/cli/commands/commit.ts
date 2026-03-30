@@ -3,7 +3,8 @@ import * as p from "@clack/prompts";
 import chalk from "chalk";
 import ora from "ora";
 import { readConfig } from "../../core/config.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import * as git from "../../infra/git.js";
 import type { ChangedFile } from "../../infra/git.js";
@@ -224,8 +225,8 @@ export function makeCommitCommand(): Command {
 
       const stagedFilesList = await git.getStagedFilesList(cwd);
 
-      validateApiKey();
-      const provider = new ClaudeProvider(config);
+      validateProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("commit");
       const spinner = ora();
       let response;

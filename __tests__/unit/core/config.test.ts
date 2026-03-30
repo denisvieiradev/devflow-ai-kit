@@ -26,7 +26,7 @@ describe("ConfigManager", () => {
     it("should override top-level fields", () => {
       const result = mergeWithDefaults({ contextMode: "light" });
       expect(result.contextMode).toBe("light");
-      expect(result.provider).toBe("claude");
+      expect(result.provider).toBe("claude-code-api-key");
     });
 
     it("should deep merge models", () => {
@@ -76,7 +76,7 @@ describe("ConfigManager", () => {
       const result = await readConfig(tempDir);
       expect(result).not.toBeNull();
       expect(result!.contextMode).toBe("light");
-      expect(result!.provider).toBe("claude");
+      expect(result!.provider).toBe("claude-code-api-key");
     });
   });
 
@@ -85,7 +85,7 @@ describe("ConfigManager", () => {
       await writeConfig(tempDir, DEFAULT_CONFIG);
       const result = await readConfig(tempDir);
       expect(result).not.toBeNull();
-      expect(result!.provider).toBe("claude");
+      expect(result!.provider).toBe("claude-code-api-key");
     });
   });
 });

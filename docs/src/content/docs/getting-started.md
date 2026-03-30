@@ -13,7 +13,9 @@ npm install -g devflow-cli
 
 - **Node.js** >= 18
 - **Git** repository initialized
-- **Anthropic API key** set as `ANTHROPIC_API_KEY` environment variable
+- **One of the following for LLM access:**
+  - **Anthropic API key** set as `ANTHROPIC_API_KEY` environment variable (provider: `claude-code-api-key`)
+  - **Claude Code CLI** installed and authenticated with an active Claude subscription (provider: `claude-code-cli`)
 - **GitHub CLI** (`gh`) installed and authenticated (for `devflow pr`)
 
 ## Quick Start

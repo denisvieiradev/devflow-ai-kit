@@ -4,7 +4,8 @@ import ora from "ora";
 import { readConfig } from "../../core/config.js";
 import { readState, writeState, updatePhase } from "../../core/state.js";
 import { resolveFeatureRef } from "../../core/pipeline.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import * as git from "../../infra/git.js";
 import { isGhAvailable, createPR } from "../../infra/github.js";
@@ -34,8 +35,8 @@ export function makePrCommand(): Command {
         p.cancel("No commits found on this branch relative to base.");
         process.exit(1);
       }
-      validateApiKey();
-      const provider = new ClaudeProvider(config);
+      validateProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("pr");
       const spinner = ora();
       let response;

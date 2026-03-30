@@ -29,7 +29,11 @@ Scans your project to detect language, framework, test framework, and CI configu
 $ devflow init
 ◆ devflow init
 │ Detected: typescript (express), jest, CI found
-│ LLM Provider: Claude (Anthropic)
+│ LLM Provider:
+│   ● Claude (API Key) — requires Anthropic API key
+│   ○ Claude Code (CLI) — uses your Claude Code subscription
 │ Context mode: Normal
 │ Config saved to .devflow/config.json
 ```
+
+When selecting **Claude Code (CLI)**, the API key prompt is skipped — devflow uses the `claude` CLI with your existing Claude subscription instead.

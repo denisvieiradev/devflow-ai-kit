@@ -8,7 +8,8 @@ import { readState, writeState, addFeature, updatePhase, setArtifact } from "../
 import { getNextFeatureNumber, generateSlug, formatFeatureRef, getFeaturePath } from "../../core/pipeline.js";
 import { TemplateEngine } from "../../core/template.js";
 import { ContextBuilder, type Document } from "../../core/context.js";
-import { ClaudeProvider, validateApiKey, handleLLMError } from "../../providers/claude.js";
+import { handleLLMError } from "../../providers/claude.js";
+import { createProvider, validateProvider } from "../../providers/factory.js";
 import { resolveModelTier } from "../../providers/model-router.js";
 import { ensureDir, fileExists } from "../../infra/filesystem.js";
 import type { FeatureState } from "../../core/types.js";
@@ -26,7 +27,7 @@ export function makePrdCommand(): Command {
         p.cancel("No config found. Run `devflow init` first.");
         process.exit(1);
       }
-      validateApiKey();
+      validateProvider(config);
       let state = await readState(cwd);
       const number = getNextFeatureNumber(state);
       const slug = generateSlug(description);
@@ -43,7 +44,7 @@ export function makePrdCommand(): Command {
         }
       }
       p.log.info(`Feature: ${featureRef}`);
-      const provider = new ClaudeProvider(config);
+      const provider = createProvider(config);
       const tier = resolveModelTier("prd");
       const spinner = ora();
       let clarificationResponse;

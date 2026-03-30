@@ -9,7 +9,7 @@ After running `devflow init`, a `.devflow/config.json` file is created:
 
 ```json
 {
-  "provider": "claude",
+  "provider": "claude-code-api-key",
   "models": {
     "fast": "claude-haiku-4-5-20251001",
     "balanced": "claude-sonnet-4-5-20250929",
@@ -34,7 +34,10 @@ After running `devflow init`, a `.devflow/config.json` file is created:
 
 ### provider
 
-LLM provider to use. Currently only `"claude"` is supported.
+LLM provider to use. Available options:
+
+- **`"claude-code-api-key"`** — Uses the Anthropic API directly with an API key. Requires `ANTHROPIC_API_KEY` to be set.
+- **`"claude-code-cli"`** — Uses the Claude Code CLI as a subprocess. Requires the `claude` CLI installed and authenticated with an active Claude subscription (Max/Pro). No API key needed.
 
 ### models
 
@@ -61,7 +64,7 @@ Path to custom template overrides. Defaults to `.devflow/templates`.
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Anthropic API key (required) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (required for `claude-code-api-key` provider) |
 | `DEVFLOW_LLM_PROVIDER` | Override provider from config |
 | `DEVFLOW_API_KEY` | Alternative to ANTHROPIC_API_KEY |
 
