@@ -6,6 +6,7 @@ import { debug } from "../infra/logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLED_TEMPLATES_PATH = join(__dirname, "..", "templates");
+const BUNDLED_TEMPLATES_PATH_ALT = join(__dirname, "..", "..", "templates");
 
 export class TemplateEngine {
   private readonly projectTemplatesPath: string;
@@ -35,6 +36,11 @@ export class TemplateEngine {
     if (await fileExists(defaultPath)) {
       debug("Loading bundled template", { path: defaultPath });
       return readFile(defaultPath, "utf-8");
+    }
+    const altPath = join(BUNDLED_TEMPLATES_PATH_ALT, `${templateName}.md`);
+    if (await fileExists(altPath)) {
+      debug("Loading bundled template (alt path)", { path: altPath });
+      return readFile(altPath, "utf-8");
     }
     throw new Error(`Template '${templateName}' not found`);
   }
