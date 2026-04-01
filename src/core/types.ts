@@ -87,8 +87,8 @@ export const DEFAULT_CONFIG: DevflowConfig = {
   provider: "claude-code-api-key",
   models: {
     fast: "claude-haiku-4-5-20251001",
-    balanced: "claude-sonnet-4-5-20250929",
-    powerful: "claude-opus-4-5-20250929",
+    balanced: "claude-sonnet-4-5-20250514",
+    powerful: "claude-opus-4-5-20250514",
   },
   language: "en",
   commitConvention: "conventional",
