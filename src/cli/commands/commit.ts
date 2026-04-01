@@ -16,7 +16,7 @@ interface SingleCommit {
 
 interface CommitPlan {
   type: "plan";
-  commits: Array<{ message: string; files: string[] }>;
+  commits: Array<{ message: string; description?: string; files: string[] }>;
 }
 
 type CommitResponse = SingleCommit | CommitPlan;
@@ -31,31 +31,64 @@ function parseCommitResponse(raw: string): CommitResponse {
   return { type: "single", message: raw.trim() };
 }
 
-function statusLabel(file: ChangedFile): string {
-  if (file.indexStatus === "?" && file.workTreeStatus === "?") return "untracked";
-  if (file.workTreeStatus === "M") return "modified";
-  if (file.workTreeStatus === "D") return "deleted";
-  return "changed";
+function statusCategory(file: ChangedFile): string {
+  if (file.indexStatus === "?" && file.workTreeStatus === "?") return "Untracked";
+  if (file.workTreeStatus === "D" || file.indexStatus === "D") return "Deleted";
+  if (file.indexStatus === "A") return "Added";
+  if (file.indexStatus === "R") return "Renamed";
+  if (file.workTreeStatus === "M" || file.indexStatus === "M") return "Modified";
+  return "Changed";
+}
+
+function coloredStatus(category: string): string {
+  switch (category) {
+    case "Untracked": return chalk.green(category);
+    case "Modified": return chalk.yellow(category);
+    case "Deleted": return chalk.red(category);
+    case "Added": return chalk.green(category);
+    case "Renamed": return chalk.cyan(category);
+    default: return chalk.dim(category);
+  }
+}
+
+function buildChangesSummary(files: ChangedFile[]): string {
+  const counts: Record<string, number> = {};
+  for (const f of files) {
+    const cat = statusCategory(f).toLowerCase();
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
+  const parts: string[] = [];
+  if (counts.modified) parts.push(chalk.yellow(`${counts.modified} modified`));
+  if (counts.added) parts.push(chalk.green(`${counts.added} added`));
+  if (counts.deleted) parts.push(chalk.red(`${counts.deleted} deleted`));
+  if (counts.renamed) parts.push(chalk.cyan(`${counts.renamed} renamed`));
+  if (counts.untracked) parts.push(chalk.green(`${counts.untracked} untracked`));
+  if (counts.changed) parts.push(chalk.dim(`${counts.changed} changed`));
+  return `${parts.join(", ")} (${files.length} file${files.length !== 1 ? "s" : ""} total)`;
 }
 
 async function selectAndStageFiles(cwd: string, files: ChangedFile[]): Promise<void> {
-  const selected = await p.multiselect({
+  const groups: Record<string, { value: string; label: string }[]> = {};
+  for (const f of files) {
+    const category = coloredStatus(statusCategory(f));
+    if (!groups[category]) groups[category] = [];
+    groups[category].push({ value: f.file, label: f.file });
+  }
+
+  const selected = await p.groupMultiselect({
     message: "Select files to stage:",
-    options: files.map((f) => ({
-      value: f.file,
-      label: f.file,
-      hint: statusLabel(f),
-    })),
+    options: groups,
   });
   if (p.isCancel(selected)) {
     p.cancel("Commit cancelled.");
     process.exit(0);
   }
-  if ((selected as string[]).length === 0) {
+  const selectedFiles = (selected as string[]).filter((s) => typeof s === "string");
+  if (selectedFiles.length === 0) {
     p.cancel("No files selected.");
     process.exit(0);
   }
-  await git.add(cwd, selected as string[]);
+  await git.add(cwd, selectedFiles);
 }
 
 const SYSTEM_PROMPT = `You are a developer writing commit messages. Analyze the git diff and the list of staged files to determine if the changes span one or multiple contexts.
@@ -73,9 +106,13 @@ If all changes belong to a SINGLE context, return:
 {"type": "single", "message": "type(scope): description"}
 
 If changes span MULTIPLE distinct contexts (e.g., a bug fix AND a new feature, or docs AND refactoring), return:
-{"type": "plan", "commits": [{"message": "type(scope): description", "files": ["file1.ts", "file2.ts"]}, {"message": "type(scope): description", "files": ["file3.ts"]}]}
+{"type": "plan", "commits": [{"message": "type(scope): short title", "description": "brief explanation of what and why", "files": ["file1.ts"]}, {"message": "type(scope): short title", "description": "brief explanation of what and why", "files": ["file3.ts"]}]}
 
-Only return a plan when there are clearly separate concerns. Do not split for minor differences.`;
+Rules for plan:
+- "message" is the commit title (max 72 chars, imperative, lowercase)
+- "description" is a brief one-line explanation of the change purpose
+- "files" lists only the files belonging to that commit
+- Only return a plan when there are clearly separate concerns. Do not split for minor differences.`;
 
 async function handleSingleCommit(
   cwd: string,
@@ -100,10 +137,11 @@ async function handleCommitPlan(
   plan: CommitPlan,
   options: { push?: boolean },
 ): Promise<void> {
-  p.log.info(chalk.bold("Commit plan detected — changes span multiple contexts:\n"));
+  p.log.info(chalk.bold("Commit plan:\n"));
   for (const [i, c] of plan.commits.entries()) {
+    const desc = c.description ? `\n     ${chalk.dim(c.description)}` : "";
     p.log.message(
-      `  ${chalk.cyan(`${i + 1}.`)} ${chalk.green(c.message)}\n     Files: ${c.files.join(", ")}`,
+      `  ${chalk.cyan(`${i + 1}.`)} ${chalk.green(c.message)}${desc}`,
     );
   }
 
@@ -122,14 +160,19 @@ async function handleCommitPlan(
   }
 
   if (action === "single") {
-    const combined = plan.commits.map((c) => c.message).join("\n");
+    const combined = plan.commits
+      .map((c) => c.description ? `${c.message}\n\n${c.description}` : c.message)
+      .join("\n\n");
     await git.commit(cwd, combined);
     p.log.success("Committed all changes as a single commit.");
   } else {
     await git.resetStaged(cwd);
     for (const group of plan.commits) {
       await git.add(cwd, group.files);
-      await git.commit(cwd, group.message);
+      const msg = group.description
+        ? `${group.message}\n\n${group.description}`
+        : group.message;
+      await git.commit(cwd, msg);
       p.log.success(`Committed: ${chalk.green(group.message)}`);
     }
   }
@@ -167,11 +210,21 @@ export function makeCommitCommand(): Command {
       let diff = await git.getStagedDiff(cwd);
 
       if (!diff) {
-        const unstaged = await git.getUnstagedFiles(cwd);
+        let unstaged: ChangedFile[];
+        try {
+          unstaged = await git.getUnstagedFiles(cwd);
+        } catch (err) {
+          p.cancel(
+            `Failed to read git status: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          process.exit(1);
+        }
         if (unstaged.length === 0) {
           p.cancel("Nothing to commit (working tree clean).");
           process.exit(1);
         }
+
+        p.log.info(`Changes detected:\n  ${buildChangesSummary(unstaged)}`);
 
         const action = await p.select({
           message: "No staged changes found. How would you like to proceed?",
@@ -199,11 +252,14 @@ export function makeCommitCommand(): Command {
       } else {
         const stagedFiles = await git.getStagedFiles(cwd);
         p.log.info(
-          `Staged files:\n${stagedFiles.map((f) => `  ${f.file}`).join("\n")}`,
+          `Staged: ${buildChangesSummary(stagedFiles)}\n${stagedFiles.map((f) => `  ${f.file}`).join("\n")}`,
         );
 
         const unstaged = await git.getUnstagedFiles(cwd);
         if (unstaged.length > 0) {
+          p.log.info(
+            `Unstaged: ${buildChangesSummary(unstaged)}`,
+          );
           const action = await p.select({
             message: "You have staged changes. What would you like to do?",
             options: [

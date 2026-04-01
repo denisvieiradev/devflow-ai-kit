@@ -61,6 +61,9 @@ jest.unstable_mockModule("chalk", () => ({
     green: (s: string) => s,
     cyan: (s: string) => s,
     bold: (s: string) => s,
+    yellow: (s: string) => s,
+    red: (s: string) => s,
+    dim: (s: string) => s,
   },
 }));
 
@@ -71,6 +74,8 @@ jest.unstable_mockModule("@clack/prompts", () => ({
   log: { info: jest.fn(), success: jest.fn(), message: jest.fn() },
   confirm: mockConfirm,
   select: mockSelect,
+  multiselect: jest.fn(),
+  groupMultiselect: jest.fn(),
   isCancel: () => false,
 }));
 
@@ -201,7 +206,7 @@ describe("commit command", () => {
     expect(mockGitCommit).toHaveBeenCalledTimes(1);
     expect(mockGitCommit).toHaveBeenCalledWith(
       expect.any(String),
-      "feat(auth): add login endpoint\nfix(db): resolve connection timeout",
+      "feat(auth): add login endpoint\n\nfix(db): resolve connection timeout",
     );
   });
 
