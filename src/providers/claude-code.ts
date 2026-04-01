@@ -154,7 +154,28 @@ export class ClaudeCodeProvider implements LLMProvider {
         maxBuffer: 10 * 1024 * 1024,
       });
       return this.parseResponse(stdout);
-    } catch (err) {
+    } catch (err: unknown) {
+      const execErr = err as { stdout?: string; stderr?: string };
+      // Try to extract the real error from CLI JSON output
+      if (execErr.stdout) {
+        try {
+          const parsed = JSON.parse(execErr.stdout);
+          if (parsed.is_error) {
+            throw new Error(`Claude CLI error: ${parsed.result}`);
+          }
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message.startsWith("Claude CLI error:")) {
+            throw parseErr;
+          }
+        }
+      }
+      // Surface stderr (filtering harmless stdin warning)
+      const stderr = execErr.stderr
+        ?.replace(/Warning: no stdin data.*\n?/g, "")
+        .trim();
+      if (stderr) {
+        throw new Error(`Claude CLI failed: ${stderr}`);
+      }
       throw this.wrapError(err);
     }
   }
@@ -181,9 +202,24 @@ export class ClaudeCodeProvider implements LLMProvider {
 
       child.on("close", (code) => {
         if (code !== 0) {
+          // Try to extract the real error from CLI JSON output
+          if (stdout) {
+            try {
+              const parsed = JSON.parse(stdout);
+              if (parsed.is_error) {
+                reject(new Error(`Claude CLI error: ${parsed.result}`));
+                return;
+              }
+            } catch {
+              // stdout wasn't valid JSON, fall through
+            }
+          }
+          const filteredStderr = stderr
+            .replace(/Warning: no stdin data.*\n?/g, "")
+            .trim();
           reject(
             new Error(
-              `Claude CLI exited with code ${code}${stderr ? `: ${stderr}` : ""}`,
+              `Claude CLI exited with code ${code}${filteredStderr ? `: ${filteredStderr}` : ""}`,
             ),
           );
           return;
