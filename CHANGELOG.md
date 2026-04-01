@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-01
+
+### Added
+- Added support for multiple provider backends
+- Added Claude binary path resolution and validation to the `init` command
+- Added language and commit convention selection to configuration setup
+- Added grouped file display with descriptions in the commit UI
+- Added npm update check notification on CLI startup
+
+### Changed
+- Updated default Claude model versions in configuration
+
+### Fixed
+- Fixed handling of renamed files in git diff parsing with improved error handling
+- Fixed CLI error handling and messages in provider layer
+- Fixed bundled templates path resolution
+- Fixed provider command execution by removing `shell: true` to improve reliability
+
 ## [1.0.0] - 2026-03-26
 
 ### Added
