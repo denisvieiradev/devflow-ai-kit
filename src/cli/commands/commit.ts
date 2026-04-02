@@ -91,6 +91,13 @@ async function selectAndStageFiles(cwd: string, files: ChangedFile[]): Promise<v
   await git.add(cwd, selectedFiles);
 }
 
+const MAX_DIFF_CHARS = 80_000;
+
+function truncateDiff(diff: string): string {
+  if (diff.length <= MAX_DIFF_CHARS) return diff;
+  return diff.slice(0, MAX_DIFF_CHARS) + "\n\n[diff truncated — too large for context window]";
+}
+
 const SYSTEM_PROMPT = `You are a developer writing commit messages. Analyze the git diff and the list of staged files to determine if the changes span one or multiple contexts.
 
 Rules for commit messages:
@@ -293,7 +300,7 @@ export function makeCommitCommand(): Command {
           messages: [
             {
               role: "user",
-              content: `Staged files:\n${stagedFilesList.join("\n")}\n\nDiff:\n${diff}`,
+              content: `Staged files:\n${stagedFilesList.join("\n")}\n\nDiff:\n${truncateDiff(diff)}`,
             },
           ],
           model: tier,
