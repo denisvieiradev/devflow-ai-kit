@@ -2,8 +2,8 @@
 
 **Stop writing PRDs, specs, and commit messages by hand.** devflow automates your entire dev workflow — from idea to merged PR.
 
-[![npm version](https://img.shields.io/npm/v/devflow-cli)](https://www.npmjs.com/package/devflow-cli)
-[![npm downloads](https://img.shields.io/npm/dm/devflow-cli)](https://www.npmjs.com/package/devflow-cli)
+[![npm version](https://img.shields.io/npm/v/@denisvieiradev/devflow-cli)](https://www.npmjs.com/package/@denisvieiradev/devflow-cli)
+[![npm downloads](https://img.shields.io/npm/dm/@denisvieiradev/devflow-cli)](https://www.npmjs.com/package/@denisvieiradev/devflow-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org)
@@ -16,7 +16,7 @@ You describe a feature in plain English. devflow generates a PRD, creates a tech
 You can also use each command standalone — smart commits, AI code review, auto-generated PRs, and automated releases work without the full pipeline.
 
 ```bash
-npm install -g devflow-cli
+npm install -g @denisvieiradev/devflow-cli
 devflow init
 ```
 
