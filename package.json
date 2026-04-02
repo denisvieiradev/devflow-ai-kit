@@ -1,6 +1,6 @@
 {
   "name": "@denisvieiradev/devflow-cli",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "CLI pipeline for structured software development — from PRD to merge",
   "type": "module",
   "bin": {
