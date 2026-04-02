@@ -4,6 +4,7 @@ import { debug } from "./logger.js";
 
 const exec = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
+const GIT_MAX_BUFFER = 10 * 1024 * 1024;
 
 interface ExecResult {
   stdout: string;
@@ -13,7 +14,7 @@ interface ExecResult {
 async function run(args: string[], cwd: string): Promise<string> {
   debug("git command", { args, cwd });
   try {
-    const result: ExecResult = await exec("git", args, { cwd, timeout: GIT_TIMEOUT_MS });
+    const result: ExecResult = await exec("git", args, { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER });
     return result.stdout.trim();
   } catch (err: unknown) {
     if (err instanceof Error && "killed" in err && (err as { killed: boolean }).killed) {
@@ -99,7 +100,7 @@ export interface ChangedFile {
 export async function parseStatus(cwd: string): Promise<ChangedFile[]> {
   let result: { stdout: string };
   try {
-    result = await exec("git", ["status", "--porcelain"], { cwd, timeout: GIT_TIMEOUT_MS });
+    result = await exec("git", ["status", "--porcelain"], { cwd, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER });
   } catch (err) {
     throw new Error(
       `Failed to read git status: ${err instanceof Error ? err.message : String(err)}`,
