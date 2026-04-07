@@ -129,6 +129,46 @@ describe("commit command", () => {
     );
   });
 
+  it("should parse JSON wrapped in code fences with extra text after", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
+    mockGetStagedDiff.mockResolvedValue("diff --git a/file.ts");
+    mockChat.mockResolvedValue({
+      content: '```json\n{\n  "type": "single",\n  "message": "refactor: rename example services"\n}\n```\n\n**Rationale:** This is a cohesive refactoring.',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockConfirm.mockResolvedValue(true);
+    mockGitCommit.mockResolvedValue("abc1234");
+
+    const cmd = makeCommitCommand();
+    await cmd.parseAsync(["node", "test"]);
+
+    expect(mockGitCommit).toHaveBeenCalledWith(
+      expect.any(String),
+      "refactor: rename example services",
+    );
+  });
+
+  it("should parse JSON mixed with surrounding explanation text", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);
+    mockGetStagedDiff.mockResolvedValue("diff --git a/file.ts");
+    mockChat.mockResolvedValue({
+      content: 'Here is the commit message:\n{"type": "single", "message": "fix(api): resolve timeout issue"}\nThis fixes the connection problem.',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+    mockConfirm.mockResolvedValue(true);
+    mockGitCommit.mockResolvedValue("abc1234");
+
+    const cmd = makeCommitCommand();
+    await cmd.parseAsync(["node", "test"]);
+
+    expect(mockGitCommit).toHaveBeenCalledWith(
+      expect.any(String),
+      "fix(api): resolve timeout issue",
+    );
+  });
+
   it("should handle raw commit message (non-JSON fallback)", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockReadConfig.mockResolvedValue({ models: { fast: "haiku" }, contextMode: "normal" } as any);

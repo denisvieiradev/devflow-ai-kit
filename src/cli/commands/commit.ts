@@ -21,13 +21,35 @@ interface CommitPlan {
 
 type CommitResponse = SingleCommit | CommitPlan;
 
-function parseCommitResponse(raw: string): CommitResponse {
+function tryParseJson(text: string): CommitResponse | null {
   try {
-    const cleaned = raw.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = JSON.parse(text.trim());
     if (parsed.type === "plan" && Array.isArray(parsed.commits)) return parsed;
     if (parsed.type === "single" && parsed.message) return parsed;
-  } catch { /* fallback to raw message */ }
+  } catch { /* not valid JSON */ }
+  return null;
+}
+
+function parseCommitResponse(raw: string): CommitResponse {
+  // Strategy 1: try parsing the whole response (pure JSON)
+  const direct = tryParseJson(raw);
+  if (direct) return direct;
+
+  // Strategy 2: extract content between markdown code fences
+  const fenceMatch = raw.match(/```json?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch?.[1]) {
+    const fromFence = tryParseJson(fenceMatch[1]);
+    if (fromFence) return fromFence;
+  }
+
+  // Strategy 3: extract first JSON object by matching braces
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    const fromBraces = tryParseJson(raw.slice(start, end + 1));
+    if (fromBraces) return fromBraces;
+  }
+
   return { type: "single", message: raw.trim() };
 }
 
